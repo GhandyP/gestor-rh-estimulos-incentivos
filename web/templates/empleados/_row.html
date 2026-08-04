@@ -1,0 +1,22 @@
+<tr>
+    <td><a href="/empleados/{{.ID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content"><strong>{{.Nombre}}</strong></a></td>
+    <td>{{.Cargo}}</td>
+    <td><span class="badge badge-info">{{.Departamento}}</span></td>
+    <td style="font-size:0.85rem;color:var(--muted)">{{.Email}}</td>
+    <td>
+        <a href="/empleados/{{.ID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-sm btn-outline">Ver perfil</a>
+    </td>
+    <td>
+        <form hx-post="/api/recomendar/{{.ID}}" hx-target="#recomendacion-{{.ID}}" hx-swap="innerHTML" style="display:inline">
+            <button class="btn btn-sm btn-primary">🎯 Recomendar</button>
+        </form>
+        <button class="btn btn-sm btn-danger"
+                hx-delete="/api/empleados/{{.ID}}"
+                hx-target="closest tr"
+                hx-swap="delete"
+                hx-confirm="¿Eliminar a {{.Nombre}}?">
+            🗑
+        </button>
+    </td>
+</tr>
+<tr id="recomendacion-{{.ID}}" style="display:none"><td colspan="6"></td></tr>

@@ -1,0 +1,23 @@
+<div class="nudge-card">
+    <div class="nudge-icon">
+        {{if eq .Tipo "defaults"}}🔧
+        {{else if eq .Tipo "social_proof"}}👥
+        {{else if eq .Tipo "framing"}}🖼️
+        {{else if eq .Tipo "friccion"}}🚀
+        {{else}}🧠{{end}}
+    </div>
+    <div class="nudge-info">
+        <h4><a href="/nudges/{{.ID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content">{{.Nombre}}</a></h4>
+        <p>{{.Descripcion}}</p>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:6px">
+            <span style="font-size:0.75rem" class="badge badge-info">{{.Ambito}}</span>
+            <label class="toggle">
+                <input type="checkbox" {{if .Activo}}checked{{end}}
+                       hx-put="/api/nudges/{{.ID}}/toggle"
+                       hx-target="closest .nudge-card"
+                       hx-swap="outerHTML">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+</div>

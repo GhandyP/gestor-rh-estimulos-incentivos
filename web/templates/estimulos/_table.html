@@ -1,0 +1,48 @@
+{{if not .Estimulos}}
+<div class="empty-state"><div class="empty-icon">⚡</div><p>No hay estímulos {{if ne .Estado "todos"}}{{.Estado}}s{{end}} aún.</p></div>
+{{else}}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Empleado</th>
+            <th>Tipo</th>
+            <th>Contenido</th>
+            <th>Intensidad</th>
+            <th>Canal</th>
+            <th>Fecha Ideal</th>
+            <th>Estado</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {{range .Estimulos}}
+    <tr>
+        <td><span style="color:var(--muted);font-size:0.8rem">#{{.ID}}</span></td>
+        <td><a href="/empleados/{{.EmpleadoID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content"><strong>{{.EmpleadoID}}</strong></a></td>
+        <td><span class="badge badge-info">{{.Tipo}}</span></td>
+        <td style="max-width:240px;font-size:0.85rem">{{.Contenido}}</td>
+        <td>{{printf "%.2f" .Intensidad}}</td>
+        <td><span class="badge badge-{{.Canal}}">{{.Canal}}</span></td>
+        <td style="font-size:0.82rem">{{.FechaIdeal.Format "2006-01-02"}}</td>
+        <td>
+            {{if eq .Estado "pendiente"}}<span class="badge badge-warn">Pendiente</span>
+            {{else if eq .Estado "aplicado"}}<span class="badge badge-ok">Aplicado</span>
+            {{else}}<span class="badge badge-high">{{.Estado}}</span>{{end}}
+        </td>
+        <td>
+            {{if eq .Estado "pendiente"}}
+            <button class="btn btn-sm btn-success"
+                    hx-get="/api/estimulos/{{.ID}}/apply-form"
+                    hx-target="#apply-form-{{.ID}}"
+                    hx-swap="innerHTML">
+                ✅ Aplicar
+            </button>
+            {{end}}
+        </td>
+    </tr>
+    <tr id="apply-form-{{.ID}}"><td colspan="9"></td></tr>
+    {{end}}
+    </tbody>
+</table>
+{{end}}

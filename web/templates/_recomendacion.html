@@ -1,0 +1,68 @@
+<div class="card" id="recomendacion-card" style="border-left:4px solid var(--primary)">
+    <h2>🎯 Diagnóstico del Motor MAP</h2>
+    <div class="alert {{if .EstimuloRecomendado}}alert-success{{else}}alert-warn{{end}}" style="margin-bottom:20px">
+        <strong>{{.Diagnostico}}</strong>
+    </div>
+
+    {{if .IncentivosRecomendados}}
+    <div style="margin-bottom:20px">
+        <h3>🏆 Incentivos Recomendados</h3>
+        <div class="grid-3">
+        {{range .IncentivosRecomendados}}
+            <div class="card" style="padding:14px">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+                    <strong>{{.Nombre}}</strong>
+                    <span class="badge badge-{{.Tipo}}">{{.Tipo}}</span>
+                </div>
+                <div style="font-size:0.82rem;color:var(--muted)">{{.Descripcion}}</div>
+                <div style="margin-top:8px;display:flex;gap:12px;font-size:0.8rem">
+                    <span>Intensidad: <strong>{{printf "%.2f" .Intensidad}}</strong></span>
+                    <span>Costo: <strong>${{printf "%.0f" .Costo}}</strong></span>
+                </div>
+            </div>
+        {{end}}
+        </div>
+    </div>
+    {{end}}
+
+    {{if .NudgesRecomendados}}
+    <div style="margin-bottom:20px">
+        <h3>🧠 Nudges Recomendados</h3>
+        <div class="grid-3">
+        {{range .NudgesRecomendados}}
+            <div class="card" style="padding:14px">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+                    <strong>{{.Nombre}}</strong>
+                    <span class="badge badge-info">{{.Tipo}}</span>
+                </div>
+                <div style="font-size:0.82rem;color:var(--muted)">{{.Descripcion}}</div>
+                <div style="margin-top:6px"><span class="badge badge-info">{{.Ambito}}</span></div>
+            </div>
+        {{end}}
+        </div>
+    </div>
+    {{end}}
+
+    {{if .EstimuloRecomendado}}
+    <div class="card" style="border:2px solid var(--success);background:#f8fff8">
+        <h3 style="color:var(--success)">✅ Estímulo Generado</h3>
+        <div class="detail-grid" style="margin-top:12px">
+            <div class="detail-item"><div class="detail-label">Tipo</div><div class="detail-value">{{.EstimuloRecomendado.Tipo}}</div></div>
+            <div class="detail-item"><div class="detail-label">Canal</div><div class="detail-value"><span class="badge badge-info">{{.EstimuloRecomendado.Canal}}</span></div></div>
+            <div class="detail-item"><div class="detail-label">Intensidad</div><div class="detail-value"><strong>{{printf "%.2f" .EstimuloRecomendado.Intensidad}}</strong></div></div>
+            <div class="detail-item"><div class="detail-label">Fecha Ideal</div><div class="detail-value">{{.EstimuloRecomendado.FechaIdeal.Format "2006-01-02"}}</div></div>
+        </div>
+        <div style="margin-top:12px;padding:12px;background:#fff;border-radius:var(--radius);border:1px solid var(--border)">
+            <div class="detail-label">Contenido</div>
+            <div style="font-size:1rem;margin-top:4px">{{.EstimuloRecomendado.Contenido}}</div>
+        </div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:8px">{{.EstimuloRecomendado.OrigenRecomendacion}}</div>
+        <div style="margin-top:16px">
+            <form hx-post="/api/estimulos/{{.EstimuloRecomendado.ID}}/aplicar" hx-ext="json-enc" hx-swap="none">
+                <input type="hidden" name="respuesta" value="0.5">
+                <button class="btn btn-success">✅ Aplicar Estímulo Ahora</button>
+            </form>
+        </div>
+    </div>
+    {{end}}
+</div>

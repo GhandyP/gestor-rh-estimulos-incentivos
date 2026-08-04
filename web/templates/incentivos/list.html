@@ -1,0 +1,37 @@
+{{define "content"}}
+<div class="toolbar">
+    <h2 style="margin:0;flex:1">🎯 Incentivos</h2>
+    <button class="btn btn-primary" hx-get="/api/incentivos/form" hx-target="#incentivo-form-container" hx-swap="innerHTML">
+        ＋ Nuevo Incentivo
+    </button>
+</div>
+
+<div id="incentivo-form-container"></div>
+
+<div class="grid">
+{{range .Incentivos}}
+    <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+                <h3 style="margin:0 0 4px 0;padding:0;border:none"><a href="/incentivos/{{.ID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content">{{.Nombre}}</a></h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin-bottom:10px">{{.Descripcion}}</p>
+            </div>
+            <span class="badge badge-{{.Tipo}}">{{.Tipo}}</span>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+            <div><span class="detail-label">Intensidad</span> <strong>{{printf "%.2f" .Intensidad}}</strong></div>
+            <div><span class="detail-label">Costo</span> <strong>${{printf "%.0f" .Costo}}</strong></div>
+            <div><span class="detail-label">Disponibilidad</span> <span class="badge badge-info">{{.Disponibilidad}}</span></div>
+            {{if eq .Disponibilidad "limitado"}}<div><span class="detail-label">Cupos</span> <strong>{{.CuposUsados}}/{{.Cupos}}</strong></div>{{end}}
+            <div>
+                {{if .Activo}}<span class="badge badge-ok">Activo</span>{{else}}<span class="badge badge-high">Inactivo</span>{{end}}
+            </div>
+        </div>
+    </div>
+{{end}}
+</div>
+
+{{if not .Incentivos}}
+<div class="empty-state"><div class="empty-icon">🎯</div><p>No hay incentivos creados aún.</p></div>
+{{end}}
+{{end}}

@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS historial_estimulos;
+DROP TABLE IF EXISTS umbrales;
+DROP TABLE IF EXISTS estimulos;
+DROP TABLE IF EXISTS nudges;
+DROP TABLE IF EXISTS elegibilidades;
+DROP TABLE IF EXISTS incentivos;
+DROP TABLE IF EXISTS perfiles_map;
+DROP TABLE IF EXISTS empleados;

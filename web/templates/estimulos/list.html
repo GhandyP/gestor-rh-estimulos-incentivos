@@ -1,0 +1,36 @@
+{{define "content"}}
+<div class="toolbar">
+    <h2 style="margin:0;flex:1">⚡ Estímulos</h2>
+</div>
+
+<div class="tabs">
+    <button class="tab {{if or (eq .Estado "todos") (not .Estado)}}active{{end}}"
+            hx-get="/estimulos?estado=todos"
+            hx-target="#estimulos-content"
+            hx-swap="innerHTML"
+            hx-push-url="true">Todos</button>
+    <button class="tab {{if eq .Estado "pendiente"}}active{{end}}"
+            hx-get="/estimulos?estado=pendiente"
+            hx-target="#estimulos-content"
+            hx-swap="innerHTML"
+            hx-push-url="true">Pendientes</button>
+    <button class="tab {{if eq .Estado "aplicado"}}active{{end}}"
+            hx-get="/estimulos?estado=aplicado"
+            hx-target="#estimulos-content"
+            hx-swap="innerHTML"
+            hx-push-url="true">Aplicados</button>
+</div>
+
+<div id="estimulos-content">
+    <div class="loading-state"><div class="spinner"></div> Cargando estímulos...</div>
+</div>
+
+<script>
+// Initial load based on current URL param or default
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var estado = params.get('estado') || 'todos';
+    htmx.ajax('GET', '/estimulos?estado=' + estado, {target: '#estimulos-content', swap: 'innerHTML'});
+})();
+</script>
+{{end}}

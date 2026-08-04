@@ -1,0 +1,18 @@
+{{if gt .Creados 0}}
+<div class="alert alert-success">
+    ✅ <strong>{{.Creados}} empleado(s)</strong> importado(s) correctamente.
+</div>
+{{end}}
+{{if .Errores}}
+<div class="alert alert-warn">
+    <strong>⚠️ {{len .Errores}} error(es):</strong>
+    <ul style="margin:8px 0 0 16px;font-size:0.85rem">
+    {{range .Errores}}
+        <li>{{.}}</li>
+    {{end}}
+    </ul>
+</div>
+{{end}}
+{{if and (eq .Creados 0) (not .Errores)}}
+<div class="alert alert-info">No se procesaron registros.</div>
+{{end}}

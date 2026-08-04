@@ -1,0 +1,43 @@
+<div class="form-inline" id="nudge-form">
+    <h3>Nuevo Nudge</h3>
+    <form hx-post="/api/nudges" hx-ext="json-enc" hx-target="#main-content" hx-swap="outerHTML">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Nombre</label>
+                <input class="form-input" type="text" name="nombre" required placeholder="Ej: Evaluación Pre-agendada">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <select class="form-select" name="tipo" required>
+                    <option value="">Seleccionar...</option>
+                    <option value="defaults">Defaults</option>
+                    <option value="social_proof">Social Proof</option>
+                    <option value="framing">Framing</option>
+                    <option value="friccion">Reducción de Fricción</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Descripción</label>
+            <textarea class="form-textarea" name="descripcion" required placeholder="Descripción del nudge..."></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Ámbito</label>
+                <select class="form-select" name="ambito" required>
+                    <option value="global">Global (toda la organización)</option>
+                    <option value="departamento">Departamento</option>
+                    <option value="individual">Individual</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Target ID (si no es global)</label>
+                <input class="form-input" type="number" name="target_id" value="0">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" class="btn" onclick="this.closest('#nudge-form').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Crear Nudge</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,35 @@
+{{define "content"}}
+<div class="toolbar">
+    <h2 style="margin:0;flex:1">🧠 Nudges Ambientales</h2>
+    <button class="btn btn-primary" hx-get="/api/nudges/form" hx-target="#nudge-form-container" hx-swap="innerHTML">
+        ＋ Nuevo Nudge
+    </button>
+</div>
+
+<div id="nudge-form-container"></div>
+
+{{if not .Nudges}}
+<div class="empty-state"><div class="empty-icon">🧠</div><p>No hay nudges configurados.</p></div>
+{{else}}
+
+<div class="nudge-group">
+    <h3>🔧 Defaults</h3>
+    {{range .Nudges}}{{if eq .Tipo "defaults"}}{{template "nudge-card" .}}{{end}}{{end}}
+</div>
+
+<div class="nudge-group">
+    <h3>👥 Social Proof</h3>
+    {{range .Nudges}}{{if eq .Tipo "social_proof"}}{{template "nudge-card" .}}{{end}}{{end}}
+</div>
+
+<div class="nudge-group">
+    <h3>🖼️ Framing</h3>
+    {{range .Nudges}}{{if eq .Tipo "framing"}}{{template "nudge-card" .}}{{end}}{{end}}
+</div>
+
+<div class="nudge-group">
+    <h3>🚀 Reducción de Fricción</h3>
+    {{range .Nudges}}{{if eq .Tipo "friccion"}}{{template "nudge-card" .}}{{end}}{{end}}
+</div>
+{{end}}
+{{end}}

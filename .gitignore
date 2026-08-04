@@ -1,0 +1,11 @@
+# Local Pi runtime state
+.atl/
+.pi/
+
+# Local SQLite database and WAL files
+estimulos.db
+*.db-wal
+*.db-shm
+
+# Built binary
+server

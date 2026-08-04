@@ -1,0 +1,29 @@
+<div class="form-inline" id="empleado-form">
+    <h3>Nuevo Empleado</h3>
+    <form hx-post="/api/empleados" hx-ext="json-enc" hx-target="#empleados-tbody" hx-swap="beforeend" hx-on::after-request="this.closest('#empleado-form').remove()">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Nombre</label>
+                <input class="form-input" type="text" name="nombre" required placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-input" type="email" name="email" required placeholder="email@empresa.com">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Cargo</label>
+                <input class="form-input" type="text" name="cargo" required placeholder="Ej: Senior Developer">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Departamento</label>
+                <input class="form-input" type="text" name="departamento" required placeholder="Ej: Ingeniería">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" class="btn" onclick="this.closest('#empleado-form').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+    </form>
+</div>

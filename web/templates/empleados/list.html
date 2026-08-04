@@ -1,0 +1,48 @@
+{{define "content"}}
+<div class="toolbar">
+    <h2 style="margin:0;flex:1">👥 Empleados</h2>
+    <button class="btn btn-primary" hx-get="/api/empleados/new-form" hx-target="#empleado-form-container" hx-swap="innerHTML">
+        ＋ Nuevo Empleado
+    </button>
+    <button class="btn btn-outline" hx-get="/api/empleados/import-form" hx-target="#import-form-container" hx-swap="innerHTML">
+        📥 Importar CSV
+    </button>
+</div>
+
+<div id="import-form-container"></div>
+<div id="empleado-form-container"></div>
+
+<div class="card">
+    <table>
+        <thead><tr><th>Nombre</th><th>Cargo</th><th>Depto</th><th>Email</th><th>Perfil MAP</th><th>Acciones</th></tr></thead>
+        <tbody id="empleados-tbody">
+        {{range .Empleados}}
+        <tr>
+            <td><a href="/empleados/{{.ID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content"><strong>{{.Nombre}}</strong></a></td>
+            <td>{{.Cargo}}</td>
+            <td><span class="badge badge-info">{{.Departamento}}</span></td>
+            <td style="font-size:0.85rem;color:var(--muted)">{{.Email}}</td>
+            <td>
+                <a href="/empleados/{{.ID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-sm btn-outline">Ver perfil</a>
+            </td>
+            <td>
+                <form hx-post="/api/recomendar/{{.ID}}" hx-target="#recomendacion-{{.ID}}" hx-swap="innerHTML" style="display:inline">
+                    <button class="btn btn-sm btn-primary">🎯 Recomendar</button>
+                </form>
+                <button class="btn btn-sm btn-danger" hx-delete="/api/empleados/{{.ID}}" hx-target="closest tr" hx-swap="delete" hx-confirm="¿Eliminar a {{.Nombre}}?" style="margin-left:4px">🗑</button>
+            </td>
+                    <button class="btn btn-sm btn-danger"
+                    hx-delete="/api/empleados/{{.ID}}"
+                    hx-target="closest tr"
+                    hx-swap="delete"
+                    hx-confirm="¿Eliminar a {{.Nombre}}?">
+                🗑
+            </button>
+            </td>
+        </tr>
+        <tr id="recomendacion-{{.ID}}" style="display:none"><td colspan="6"></td></tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

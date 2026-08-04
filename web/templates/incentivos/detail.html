@@ -1,0 +1,51 @@
+{{define "content"}}
+<div class="toolbar">
+    <a href="/incentivos" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-outline">← Volver a Incentivos</a>
+</div>
+
+{{with .Incentivo}}
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+            <h2 style="border:none;margin:0;padding:0">🎯 {{.Nombre}}</h2>
+            <p style="color:var(--muted);margin-top:4px">{{.Descripcion}}</p>
+        </div>
+        <div>
+            <span class="badge badge-{{.Tipo}}" style="font-size:0.9rem">{{.Tipo}}</span>
+            {{if .Activo}}<span class="badge badge-ok" style="font-size:0.9rem">Activo</span>{{else}}<span class="badge badge-high" style="font-size:0.9rem">Inactivo</span>{{end}}
+        </div>
+    </div>
+    <div class="detail-grid" style="margin-top:20px">
+        <div class="detail-item"><div class="detail-label">Intensidad Motivacional</div><div class="detail-value"><strong>{{printf "%.2f" .Intensidad}}</strong> / 1.0</div></div>
+        <div class="detail-item"><div class="detail-label">Costo Estimado</div><div class="detail-value"><strong>${{printf "%.0f" .Costo}}</strong></div></div>
+        <div class="detail-item"><div class="detail-label">Disponibilidad</div><div class="detail-value"><span class="badge badge-info">{{.Disponibilidad}}</span></div></div>
+        {{if eq .Disponibilidad "limitado"}}
+        <div class="detail-item"><div class="detail-label">Cupos</div><div class="detail-value"><strong>{{.CuposUsados}} / {{.Cupos}}</strong></div></div>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{if .Elegibilidades}}
+<div class="card">
+    <h2>📋 Criterios de Elegibilidad</h2>
+    <table>
+        <thead><tr><th>Campo</th><th>Operador</th><th>Valor</th></tr></thead>
+        <tbody>
+        {{range .Elegibilidades}}
+        <tr>
+            <td><strong>{{.Campo}}</strong></td>
+            <td><code>{{.Operador}}</code></td>
+            <td>{{.Valor}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+{{else}}
+<div class="card">
+    <h2>📋 Criterios de Elegibilidad</h2>
+    <div class="empty-state"><p>Sin criterios — todos los empleados son elegibles.</p></div>
+</div>
+{{end}}
+{{end}}

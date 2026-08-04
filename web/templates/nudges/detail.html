@@ -1,0 +1,39 @@
+{{define "content"}}
+<div class="toolbar">
+    <a href="/nudges" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-outline">← Volver a Nudges</a>
+</div>
+
+{{with .}}
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+            <h2 style="border:none;margin:0;padding:0">🧠 {{.Nombre}}</h2>
+            <p style="color:var(--muted);margin-top:4px">{{.Descripcion}}</p>
+        </div>
+        <div>
+            <span class="badge badge-{{.Tipo}}" style="font-size:0.9rem">{{.Tipo}}</span>
+            {{if .Activo}}<span class="badge badge-ok" style="font-size:0.9rem">Activo</span>{{else}}<span class="badge badge-high" style="font-size:0.9rem">Inactivo</span>{{end}}
+        </div>
+    </div>
+    <div class="detail-grid" style="margin-top:20px">
+        <div class="detail-item"><div class="detail-label">Tipo de Nudge</div><div class="detail-value"><span class="badge badge-{{.Tipo}}">{{.Tipo}}</span></div></div>
+        <div class="detail-item"><div class="detail-label">Ámbito</div><div class="detail-value"><span class="badge badge-info">{{.Ambito}}</span></div></div>
+        {{if ne .Ambito "global"}}
+        <div class="detail-item"><div class="detail-label">Target ID</div><div class="detail-value">{{.TargetID}}</div></div>
+        {{end}}
+        <div class="detail-item">
+            <div class="detail-label">Estado</div>
+            <div class="detail-value">
+                <label class="toggle">
+                    <input type="checkbox" {{if .Activo}}checked{{end}}
+                           hx-put="/api/nudges/{{.ID}}/toggle"
+                           hx-target="closest .detail-value"
+                           hx-swap="outerHTML">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+{{end}}

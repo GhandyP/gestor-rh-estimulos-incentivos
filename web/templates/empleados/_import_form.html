@@ -1,0 +1,24 @@
+<div class="form-inline" id="import-form">
+    <h3>📥 Importar Empleados desde CSV</h3>
+    <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px">
+        El archivo debe tener columnas: <code>nombre,email,cargo,departamento</code>.
+        <a href="/api/empleados/template" style="color:var(--primary)">Descargar plantilla CSV</a>
+    </p>
+    <form hx-encoding="multipart/form-data"
+          hx-post="/api/empleados/import"
+          hx-target="#import-result"
+          hx-swap="innerHTML">
+        <div class="form-group">
+            <label class="form-label">Archivo CSV</label>
+            <input class="form-input" type="file" name="file" accept=".csv" required>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+            <button type="submit" class="btn btn-primary">
+                Importar
+                <span class="htmx-indicator spinner spinner-sm"></span>
+            </button>
+            <button type="button" class="btn" onclick="this.closest('#import-form').remove()">Cancelar</button>
+        </div>
+    </form>
+    <div id="import-result" style="margin-top:12px"></div>
+</div>

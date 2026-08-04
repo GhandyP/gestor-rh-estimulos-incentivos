@@ -1,0 +1,23 @@
+<h2>📈 Efectividad de Estímulos</h2>
+{{if .Efectividad}}
+<table>
+    <thead><tr><th>Tipo</th><th>Aplicados</th><th>Exitosos</th><th>Tasa de éxito</th></tr></thead>
+    <tbody>
+    {{range .Efectividad}}
+    <tr>
+        <td><strong>{{.Tipo}}</strong></td>
+        <td>{{.TotalAplicados}}</td>
+        <td>{{.TotalExitosos}}</td>
+        <td>
+            <div style="display:flex;align-items:center;gap:10px">
+                <div class="map-bar" style="width:120px"><div class="map-bar-fill bar-exito" style="width:{{percent .TasaExito}}%"></div></div>
+                <span style="font-weight:600;font-size:0.85rem">{{percent .TasaExito}}%</span>
+            </div>
+        </td>
+    </tr>
+    {{end}}
+    </tbody>
+</table>
+{{else}}
+<div class="empty-state"><p>Sin datos de efectividad aún. Aplicá estímulos para ver resultados.</p></div>
+{{end}}

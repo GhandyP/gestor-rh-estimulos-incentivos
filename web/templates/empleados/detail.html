@@ -1,0 +1,102 @@
+{{define "content"}}
+<div class="toolbar">
+    <a href="/empleados" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-outline">← Volver a Empleados</a>
+</div>
+
+{{with .Empleado}}
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+            <h2 style="border:none;margin:0;padding:0">👤 {{.Nombre}}</h2>
+            <p style="color:var(--muted);margin-top:4px">{{.Cargo}} · {{.Departamento}}</p>
+        </div>
+        <div>
+            <form hx-post="/api/recomendar/{{.ID}}" hx-target="#recomendacion-result" hx-swap="innerHTML">
+                <button class="btn btn-primary btn-lg">
+                    🎯 Recomendar Intervención
+                    <span class="htmx-indicator spinner spinner-sm"></span>
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="detail-grid" style="margin-top:16px">
+        <div class="detail-item"><div class="detail-label">Email</div><div class="detail-value">{{.Email}}</div></div>
+        <div class="detail-item"><div class="detail-label">Cargo</div><div class="detail-value">{{.Cargo}}</div></div>
+        <div class="detail-item"><div class="detail-label">Departamento</div><div class="detail-value"><span class="badge badge-info">{{.Departamento}}</span></div></div>
+        <div class="detail-item"><div class="detail-label">Fecha de Ingreso</div><div class="detail-value">{{.FechaIngreso}}</div></div>
+        <div class="detail-item"><div class="detail-label">Estado</div><div class="detail-value">{{if .Activo}}<span class="badge badge-ok">Activo</span>{{else}}<span class="badge badge-high">Inactivo</span>{{end}}</div></div>
+    </div>
+</div>
+{{end}}
+
+<div id="recomendacion-result" style="margin-bottom:20px"></div>
+
+{{with .Perfil}}
+<div class="card">
+    <h2>🧠 Perfil MAP</h2>
+    <div class="grid-3">
+        <div style="text-align:center;padding:16px">
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:6px">Motivación</div>
+            <div style="font-size:2rem;font-weight:800;color:var(--primary)">{{percent .Motivacion}}%</div>
+            <div class="map-bar"><div class="map-bar-fill bar-motivacion" style="width:{{percent .Motivacion}}%"></div></div>
+        </div>
+        <div style="text-align:center;padding:16px">
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:6px">Habilidad</div>
+            <div style="font-size:2rem;font-weight:800;color:var(--success)">{{percent .Habilidad}}%</div>
+            <div class="map-bar"><div class="map-bar-fill bar-habilidad" style="width:{{percent .Habilidad}}%"></div></div>
+        </div>
+        <div style="text-align:center;padding:16px">
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:6px">Prompt</div>
+            <div style="font-size:2rem;font-weight:800;color:#6f42c1">{{percent .Prompt}}%</div>
+            <div class="map-bar"><div class="map-bar-fill bar-prompt" style="width:{{percent .Prompt}}%"></div></div>
+        </div>
+    </div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:24px;flex-wrap:wrap">
+        <div><span class="detail-label">Sensibilidad</span> <span class="badge badge-info">{{.Sensibilidad}}</span></div>
+        <div><span class="detail-label">Confiabilidad</span> <strong>{{percent .Confiabilidad}}%</strong></div>
+    </div>
+    <div style="margin-top:16px">
+        <button class="btn btn-outline btn-sm" hx-get="/api/empleados/{{.EmpleadoID}}/perfil-form" hx-target="#perfil-edit-form" hx-swap="innerHTML">✏️ Editar Perfil MAP</button>
+        <div id="perfil-edit-form" style="margin-top:16px"></div>
+    </div>
+</div>
+{{end}}
+
+{{with .Umbral}}
+<div class="card">
+    <h2>📐 Umbral Psicométrico</h2>
+    <div class="detail-grid">
+        <div class="detail-item"><div class="detail-label">Umbral Absoluto</div><div class="detail-value">{{printf "%.2f" .UmbralAbsoluto}}</div></div>
+        <div class="detail-item"><div class="detail-label">Umbral Diferencial (Weber)</div><div class="detail-value">{{printf "%.2f" .UmbralDiferencial}}</div></div>
+        <div class="detail-item"><div class="detail-label">Último Estímulo</div><div class="detail-value">{{printf "%.2f" .UltimoEstimulo}}</div></div>
+        <div class="detail-item"><div class="detail-label">Intensidad Mínima Perceptible</div><div class="detail-value"><strong>{{printf "%.2f" .IntensidadMinimaPerceptible}}</strong></div></div>
+    </div>
+    {{if .FechaUltimoEstimulo}}
+    <div style="font-size:0.82rem;color:var(--muted);margin-top:8px">Último estímulo: {{.FechaUltimoEstimulo}}</div>
+    {{end}}
+</div>
+{{end}}
+
+{{if .Historial}}
+<div class="card">
+    <h2>📜 Historial de Estímulos</h2>
+    <table>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Intensidad</th><th>Respuesta MAP</th></tr></thead>
+        <tbody>
+        {{range .Historial}}
+        <tr>
+            <td>{{.Fecha}}</td>
+            <td><span class="badge badge-info">{{.Tipo}}</span></td>
+            <td>{{printf "%.2f" .Intensidad}}</td>
+            <td>
+                {{if gt .RespuestaMAP 0}}<span class="badge badge-ok">＋{{printf "%.2f" .RespuestaMAP}}</span>
+                {{else}}<span class="badge badge-med">{{printf "%.2f" .RespuestaMAP}}</span>{{end}}
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+
+{{end}}

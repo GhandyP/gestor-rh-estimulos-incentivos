@@ -1,0 +1,28 @@
+<h2>👥 Distribución MAP por Departamento</h2>
+{{if .Distribuciones}}
+{{range .Distribuciones}}
+<div style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong>{{.Depto}}</strong>
+        <span style="font-size:0.8rem;color:var(--muted)">{{.TotalEmpleados}} empleados · MAP {{printf "%.2f" .MAP}}</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:3px">
+        <span style="font-size:0.72rem;color:var(--muted);width:14px">M</span>
+        <div class="map-bar" style="flex:1"><div class="map-bar-fill bar-motivacion" style="width:{{percent .PromedioM}}%"></div></div>
+        <span style="font-size:0.78rem;font-weight:600;width:38px;text-align:right">{{percent .PromedioM}}%</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:3px">
+        <span style="font-size:0.72rem;color:var(--muted);width:14px">A</span>
+        <div class="map-bar" style="flex:1"><div class="map-bar-fill bar-habilidad" style="width:{{percent .PromedioA}}%"></div></div>
+        <span style="font-size:0.78rem;font-weight:600;width:38px;text-align:right">{{percent .PromedioA}}%</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:0.72rem;color:var(--muted);width:14px">P</span>
+        <div class="map-bar" style="flex:1"><div class="map-bar-fill bar-prompt" style="width:{{percent .PromedioP}}%"></div></div>
+        <span style="font-size:0.78rem;font-weight:600;width:38px;text-align:right">{{percent .PromedioP}}%</span>
+    </div>
+</div>
+{{end}}
+{{else}}
+<div class="empty-state"><p>Sin datos de distribución disponibles.</p></div>
+{{end}}

@@ -1,0 +1,226 @@
+{{define "base"}}<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{block "title" .}}RRHH · Estímulos e Incentivos{{end}}</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
+    <style>
+        :root {
+            --bg: #f8f9fa; --card: #ffffff; --border: #dee2e6;
+            --text: #212529; --muted: #6c757d; --primary: #0d6efd;
+            --success: #198754; --warning: #ffc107; --danger: #dc3545;
+            --radius: 8px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* Header & Navigation */
+        header { background: var(--card); border-bottom: 1px solid var(--border); padding: 0; margin-bottom: 0; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100; }
+        header .header-inner { max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        header h1 { font-size: 1.35rem; font-weight: 700; white-space: nowrap; }
+        header nav { display: flex; gap: 4px; flex-wrap: wrap; }
+        header nav a { padding: 8px 16px; border-radius: var(--radius); text-decoration: none; color: var(--muted); font-size: 0.875rem; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
+        header nav a:hover { background: var(--bg); color: var(--text); }
+        header nav a.active { background: var(--primary); color: #fff; }
+
+        /* Grid & Card */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+        .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+        .card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+
+        /* Summary / KPI stats */
+        .summary { display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+        .summary-box { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 24px 28px; text-align: center; min-width: 160px; flex: 1; transition: border-color 0.2s; }
+        .summary-box.danger { border-color: var(--danger); background: #fff5f5; }
+        .summary-box.warning { border-color: var(--warning); background: #fffef5; }
+        .stat-number { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+        .stat-label { color: var(--muted); font-size: 0.85rem; margin-top: 4px; font-weight: 500; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; background: var(--bg); }
+        tr:hover td { background: #f8f9ff; }
+        td a { color: var(--primary); text-decoration: none; font-weight: 500; }
+        td a:hover { text-decoration: underline; }
+
+        /* Badges */
+        .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; display: inline-block; white-space: nowrap; }
+        .badge-high, .badge-danger { background: #f8d7da; color: #842029; }
+        .badge-med, .badge-warn { background: #fff3cd; color: #664d03; }
+        .badge-low, .badge-ok { background: #d1e7dd; color: #0f5132; }
+        .badge-info { background: #e8f4fd; color: var(--primary); }
+        .badge-identidad { background: #e8daef; color: #6c3483; }
+        .badge-beneficios { background: #d5f5e3; color: #1e8449; }
+        .badge-formacion { background: #d6eaf8; color: #2471a3; }
+        .badge-proyecto { background: #fdebd0; color: #b9770e; }
+        .badge-defaults { background: #e8daef; color: #6c3483; }
+        .badge-social { background: #d6eaf8; color: #2471a3; }
+        .badge-framing { background: #fdebd0; color: #b9770e; }
+        .badge-friccion { background: #fadbd8; color: #922b21; }
+
+        /* Buttons */
+        .btn { padding: 9px 18px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; background: var(--card); font-size: 0.875rem; font-weight: 500; color: var(--text); transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+        .btn:hover { background: var(--bg); border-color: #bbb; }
+        .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-primary:hover { background: #0b5ed7; }
+        .btn-success { background: var(--success); color: #fff; border-color: var(--success); }
+        .btn-success:hover { background: #157347; }
+        .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+        .btn-danger:hover { background: #bb2d3b; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+        .btn-lg { padding: 12px 24px; font-size: 1rem; }
+        .btn-outline { background: transparent; border-color: var(--primary); color: var(--primary); }
+        .btn-outline:hover { background: var(--primary); color: #fff; }
+        .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+
+        /* Forms */
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+            font-size: 0.9rem; font-family: inherit; transition: border-color 0.15s; background: #fff;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,110,253,0.15); }
+        .form-textarea { resize: vertical; min-height: 80px; }
+        .form-select { cursor: pointer; }
+        .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .form-row > * { flex: 1; min-width: 180px; }
+        .form-inline { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+        .form-inline h3 { margin-bottom: 16px; }
+        .field-error { color: var(--danger); font-size: 0.8rem; margin-top: 4px; }
+
+        /* Map Bars */
+        .map-bar { height: 8px; border-radius: 4px; background: var(--border); margin-top: 4px; overflow: hidden; width: 100%; }
+        .map-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+        .bar-m, .bar-motivacion { background: var(--primary); }
+        .bar-a, .bar-habilidad { background: var(--success); }
+        .bar-p, .bar-prompt { background: #6f42c1; }
+        .bar-producto { background: var(--warning); }
+        .bar-exito { background: var(--success); }
+
+        /* Chart bars (horizontal) */
+        .chart-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+        .chart-label { width: 140px; font-size: 0.85rem; font-weight: 600; flex-shrink: 0; }
+        .chart-track { flex: 1; height: 22px; background: var(--border); border-radius: 4px; overflow: hidden; position: relative; }
+        .chart-fill { height: 100%; border-radius: 4px; position: absolute; left: 0; top: 0; transition: width 0.5s ease; }
+        .chart-value { width: 50px; text-align: right; font-size: 0.8rem; font-weight: 600; color: var(--muted); flex-shrink: 0; }
+
+        /* Alerts */
+        .alert { padding: 14px 18px; border-radius: var(--radius); margin-bottom: 16px; font-size: 0.9rem; }
+        .alert-info { background: #e8f4fd; border: 1px solid #b6d4fe; color: #084298; }
+        .alert-warn { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; }
+        .alert-danger { background: #f8d7da; border: 1px solid #dc3545; color: #842029; }
+        .alert-success { background: #d1e7dd; border: 1px solid #198754; color: #0f5132; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; font-size: 0.875rem; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        /* Toggle switch */
+        .toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 24px; transition: 0.2s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+        .toggle input:checked + .toggle-slider { background: var(--success); }
+        .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+        /* Toast notifications */
+        .toast-container { position: fixed; top: 80px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: 400px; }
+        .toast { padding: 14px 20px; border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 0.9rem; animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 10px; }
+        .toast-success { background: #d1e7dd; border: 1px solid #198754; color: #0f5132; }
+        .toast-error { background: #f8d7da; border: 1px solid #dc3545; color: #842029; }
+        .toast-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; }
+        .toast .toast-close { margin-left: auto; cursor: pointer; background: none; border: none; font-size: 1.2rem; color: inherit; opacity: 0.7; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* HTMX indicators */
+        .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        .htmx-request.htmx-indicator { opacity: 1; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 2.5px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; }
+        .spinner-sm { width: 14px; height: 14px; border-width: 2px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-state { text-align: center; padding: 40px; color: var(--muted); }
+
+        /* Fogg curve indicator */
+        .curve-indicator { padding: 16px; border-radius: var(--radius); text-align: center; font-weight: 600; margin-bottom: 16px; }
+        .curve-above { background: #d1e7dd; border: 1px solid #198754; color: #0f5132; }
+        .curve-below { background: #f8d7da; border: 1px solid #dc3545; color: #842029; }
+        .curve-producto { font-size: 2rem; font-weight: 800; }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
+        .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+        .empty-state p { font-size: 0.95rem; }
+
+        /* Detail sections */
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .detail-item { padding: 10px 0; }
+        .detail-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; }
+        .detail-value { font-size: 1rem; font-weight: 500; margin-top: 2px; }
+
+        /* Nudge panel */
+        .nudge-group { margin-bottom: 28px; }
+        .nudge-group h3 { font-size: 1rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .nudge-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 16px; }
+        .nudge-card .nudge-icon { font-size: 1.5rem; width: 40px; text-align: center; }
+        .nudge-card .nudge-info { flex: 1; }
+        .nudge-card .nudge-info h4 { font-size: 0.95rem; margin-bottom: 4px; }
+        .nudge-card .nudge-info p { font-size: 0.82rem; color: var(--muted); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 16px; }
+            header .header-inner { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
+            .summary { flex-direction: column; }
+            .summary-box { min-width: 0; }
+            .grid, .grid-3, .detail-grid { grid-template-columns: 1fr; }
+            table { font-size: 0.8rem; }
+            th, td { padding: 8px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <h1>📊 RRHH · Estímulos e Incentivos</h1>
+            <nav>
+                <a href="/" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Dashboard</a>
+                <a href="/empleados" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Empleados</a>
+                <a href="/incentivos" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Incentivos</a>
+                <a href="/nudges" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Nudges</a>
+                <a href="/estimulos" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Estímulos</a>
+            </nav>
+        </div>
+    </header>
+    <div id="toast-container" class="toast-container"></div>
+    <div id="main-content" class="container">
+{{template "content" .}}
+    </div>
+{{block "scripts" .}}{{end}}
+<script>
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+    var toast = document.getElementById('toast-container');
+    if (!toast) return;
+    var msg = evt.detail.xhr.getResponseHeader('X-Toast') || '';
+    if (!msg && evt.detail.successful) msg = '✅ Operación exitosa';
+    if (!msg && !evt.detail.successful) msg = '❌ Error: ' + (evt.detail.xhr.status || 'desconocido');
+    if (!msg) return;
+    var el = document.createElement('div');
+    el.className = 'toast ' + (evt.detail.successful ? 'toast-success' : 'toast-error');
+    el.innerHTML = msg + '<button class="toast-close" onclick="this.parentElement.remove()">×</button>';
+    toast.appendChild(el);
+    setTimeout(function() { el.remove(); }, 4000);
+});
+</script>
+</body>
+</html>
+{{end}}

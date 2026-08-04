@@ -1,0 +1,53 @@
+<div class="form-inline" id="incentivo-form">
+    <h3>Nuevo Incentivo</h3>
+    <form hx-post="/api/incentivos" hx-ext="json-enc" hx-target="#main-content" hx-swap="outerHTML">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Nombre</label>
+                <input class="form-input" type="text" name="nombre" required placeholder="Ej: Días Extra de Vacaciones">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <select class="form-select" name="tipo" required>
+                    <option value="">Seleccionar...</option>
+                    <option value="identidad">Identidad</option>
+                    <option value="beneficios">Beneficios</option>
+                    <option value="formacion">Formación</option>
+                    <option value="proyecto_corporativo">Proyecto Corporativo</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Descripción</label>
+            <textarea class="form-textarea" name="descripcion" required placeholder="Descripción del incentivo..."></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Intensidad (0.0 - 1.0)</label>
+                <input class="form-input" type="number" name="intensidad" min="0" max="1" step="0.01" value="0.5" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Costo ($)</label>
+                <input class="form-input" type="number" name="costo" min="0" step="1" value="0" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Disponibilidad</label>
+                <select class="form-select" name="disponibilidad">
+                    <option value="permanente">Permanente</option>
+                    <option value="recurrente">Recurrente</option>
+                    <option value="limitado">Limitado</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cupos (si es limitado)</label>
+                <input class="form-input" type="number" name="cupos" min="0" value="0">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" class="btn" onclick="this.closest('#incentivo-form').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Crear Incentivo</button>
+        </div>
+    </form>
+</div>

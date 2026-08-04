@@ -1,0 +1,22 @@
+<h2>⚡ Zona de Riesgo</h2>
+{{if .ZonaRiesgo}}
+<table>
+    <thead><tr><th>Empleado</th><th>MAP</th><th>Severidad</th><th>Motivo</th></tr></thead>
+    <tbody>
+    {{range .ZonaRiesgo}}
+    <tr>
+        <td><a href="/empleados/{{.EmpleadoID}}" hx-boost="true" hx-target="#main-content" hx-select="#main-content"><strong>{{.Nombre}}</strong></a></td>
+        <td>{{printf "%.2f" .MAPProducto}}</td>
+        <td>
+            {{if eq .Severidad "alta"}}<span class="badge badge-high">Alta</span>
+            {{else if eq .Severidad "media"}}<span class="badge badge-med">Media</span>
+            {{else}}<span class="badge badge-low">Baja</span>{{end}}
+        </td>
+        <td style="font-size:0.82rem;max-width:220px">{{.Motivo}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+</table>
+{{else}}
+<div class="empty-state"><div class="empty-icon">✅</div><p>Todos los empleados sobre la curva de acción.</p></div>
+{{end}}

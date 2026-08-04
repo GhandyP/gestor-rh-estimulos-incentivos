@@ -1,0 +1,18 @@
+{{define "content"}}
+<div id="dashboard-stats" hx-get="/api/dashboard/stats" hx-trigger="load" hx-swap="innerHTML">
+    <div class="loading-state"><div class="spinner"></div> Cargando métricas...</div>
+</div>
+
+<div class="grid" style="margin-top:20px">
+    <div class="card" id="distribucion-mapa" hx-get="/api/dashboard/distribucion" hx-trigger="load" hx-swap="innerHTML">
+        <div class="loading-state"><div class="spinner"></div> Cargando distribución...</div>
+    </div>
+    <div class="card" id="zona-riesgo" hx-get="/api/dashboard/riesgos" hx-trigger="load" hx-swap="innerHTML">
+        <div class="loading-state"><div class="spinner"></div> Cargando riesgos...</div>
+    </div>
+</div>
+
+<div class="card" id="efectividad" style="margin-top:20px" hx-get="/api/dashboard/efectividad" hx-trigger="load" hx-swap="innerHTML">
+    <div class="loading-state"><div class="spinner"></div> Cargando efectividad...</div>
+</div>
+{{end}}

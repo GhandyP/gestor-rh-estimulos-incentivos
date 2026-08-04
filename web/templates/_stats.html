@@ -1,0 +1,18 @@
+<div class="summary">
+    <div class="summary-box">
+        <div class="stat-number">{{.TotalEmpleados}}</div>
+        <div class="stat-label">Empleados activos</div>
+    </div>
+    <div class="summary-box{{if gt .EmpleadosEnRiesgo 0}} danger{{end}}">
+        <div class="stat-number">{{.EmpleadosEnRiesgo}}</div>
+        <div class="stat-label">En zona de riesgo</div>
+    </div>
+    <div class="summary-box">
+        <div class="stat-number">{{.IncentivosActivos}}</div>
+        <div class="stat-label">Incentivos activos</div>
+    </div>
+    <div class="summary-box">
+        <div class="stat-number">{{.NudgesActivos}}</div>
+        <div class="stat-label">Nudges activos</div>
+    </div>
+</div>
