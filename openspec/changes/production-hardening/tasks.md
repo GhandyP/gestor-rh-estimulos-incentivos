@@ -51,5 +51,5 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Portfolio Documentation
 
-- [ ] 5.1 `README.md` — architecture layers, threat model + single-operator scope, persistence/backup, demo/seed, deployment, verification, non-goals
-- [ ] 5.2 `doc/*design*.md` — decisions, migration/rollback, limitations; walkthrough matches tested behavior
+- [x] 5.1 `README.md` — architecture layers, threat model + single-operator scope, persistence/backup, demo/seed, deployment, verification, non-goals
+- [x] 5.2 `doc/*design*.md` — decisions, migration/rollback, limitations; walkthrough matches tested behavior
