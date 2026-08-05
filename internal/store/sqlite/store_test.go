@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -226,6 +227,147 @@ func TestTransitionEstimuloTxMissingStimulus(t *testing.T) {
 	}
 	if applied {
 		t.Fatal("TransitionEstimuloTx for missing id = true, want false")
+	}
+}
+
+// Spec: "Concurrent application has one winner" — N goroutines intentan la
+// transición del MISMO estímulo en transacciones propias (una conexión
+// serializa los writers): exactamente una gana, el resto reporta conflicto,
+// y no hay historial duplicado. El setup es real SQLite (temp DB con
+// migraciones), no mocks.
+func TestTransitionEstimuloTxConcurrentOneWinner(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	e := testEmpleado()
+	if err := s.CreateEmpleado(ctx, e); err != nil {
+		t.Fatalf("create empleado: %v", err)
+	}
+	est := &domain.Estimulo{
+		EmpleadoID:          e.ID,
+		Tipo:                "recomendacion_personalizada",
+		Contenido:           "Oportunidad de desarrollo profesional",
+		Intensidad:          0.6,
+		Canal:               domain.CanalEmail,
+		Estado:              domain.EstadoPendiente,
+		FechaIdeal:          time.Now(),
+		OrigenRecomendacion: "motor MAP",
+	}
+	if err := s.CreateEstimulo(ctx, est); err != nil {
+		t.Fatalf("create estimulo: %v", err)
+	}
+	u := testUmbral(e.ID)
+	if err := s.CreateUmbral(ctx, u); err != nil {
+		t.Fatalf("create umbral: %v", err)
+	}
+
+	const workers = 8
+	start := make(chan struct{})
+	results := make([]bool, workers)
+	errs := make([]error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			results[i], errs[i] = func() (bool, error) {
+				var applied bool
+				err := s.WithTx(ctx, func(tx *sql.Tx) error {
+					var err error
+					applied, err = s.TransitionEstimuloTx(ctx, tx, est.ID, time.Now().UTC())
+					if err != nil {
+						return err
+					}
+					if !applied {
+						return nil
+					}
+					// Solo el ganador escribe el historial, como hace el service.
+					return s.AddHistorialTx(ctx, tx, u.ID, domain.PuntoHistorial{
+						Fecha:        time.Now(),
+						Intensidad:   0.6,
+						RespuestaMAP: 0.7,
+						Tipo:         est.Tipo,
+					})
+				})
+				return applied, err
+			}()
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	winners, conflicts, failures := 0, 0, 0
+	for i := 0; i < workers; i++ {
+		switch {
+		case errs[i] != nil:
+			failures++
+		case results[i]:
+			winners++
+		default:
+			conflicts++
+		}
+	}
+	if failures != 0 {
+		t.Fatalf("concurrent transitions errors = %d (%v), want 0", failures, errs)
+	}
+	if winners != 1 {
+		t.Fatalf("winners = %d, want exactly 1", winners)
+	}
+	if conflicts != workers-1 {
+		t.Fatalf("conflicts = %d, want %d", conflicts, workers-1)
+	}
+
+	got, err := s.GetEstimulo(ctx, est.ID)
+	if err != nil || got == nil {
+		t.Fatalf("get estimulo: %v, %v", got, err)
+	}
+	if got.Estado != domain.EstadoAplicado {
+		t.Fatalf("estimulo estado = %q, want %q", got.Estado, domain.EstadoAplicado)
+	}
+
+	historial, err := s.GetHistorial(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("get historial: %v", err)
+	}
+	if len(historial) != 1 {
+		t.Fatalf("historial = %d entries, want exactly 1 (los perdedores no escriben)", len(historial))
+	}
+}
+
+// Spec: "SQLite failures prove rollback" — el flujo completo (empleado +
+// perfil + umbral) falla DESPUÉS de tres escrituras exitosas; al reabrir la
+// base no queda NINGÚN estado parcial en ninguna de las tres tablas.
+func TestMultiEntityWorkflowRollbackLeavesNoPartialState(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	boom := errors.New("injected failure after third write")
+	err := s.WithTx(ctx, func(tx *sql.Tx) error {
+		e := testEmpleado()
+		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+			return err
+		}
+		if err := s.CreatePerfilMAPTx(ctx, tx, testPerfil(e.ID)); err != nil {
+			return err
+		}
+		if err := s.CreateUmbralTx(ctx, tx, testUmbral(e.ID)); err != nil {
+			return err
+		}
+		return boom
+	})
+	if !errors.Is(err, boom) {
+		t.Fatalf("WithTx error = %v, want %v", err, boom)
+	}
+
+	for _, table := range []string{"empleados", "perfiles_map", "umbrales"} {
+		var count int
+		if err := s.db.QueryRowContext(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("%s after failed workflow = %d, want 0 (no partial state)", table, count)
+		}
 	}
 }
 
