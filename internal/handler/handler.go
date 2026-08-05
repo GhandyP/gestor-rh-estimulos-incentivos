@@ -19,16 +19,22 @@ var templateFuncs = template.FuncMap{
 
 // Handler maneja rutas HTTP para el sistema de Estímulos e Incentivos.
 type Handler struct {
-	Svc *service.Service
+	Svc  *service.Service
+	auth *Authenticator
 }
 
-// New crea un nuevo Handler.
-func New(svc *service.Service) *Handler {
-	return &Handler{Svc: svc}
+// New crea un nuevo Handler con el límite de seguridad de operador.
+func New(svc *service.Service, auth *Authenticator) *Handler {
+	return &Handler{Svc: svc, auth: auth}
 }
 
 // RegisterRoutes registra todas las rutas HTML y API en el mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	// --- Autenticación del operador ---
+	mux.HandleFunc("GET /login", h.LoginPage)
+	mux.HandleFunc("POST /login", h.Login)
+	mux.HandleFunc("POST /logout", h.Logout)
+
 	// --- Páginas HTML ---
 	mux.HandleFunc("GET /", h.Dashboard)
 	mux.HandleFunc("GET /empleados", h.EmpleadosPage)
@@ -96,6 +102,54 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// --- Páginas de detalle adicionales ---
 	mux.HandleFunc("GET /incentivos/{id}", h.IncentivoDetailPage)
 	mux.HandleFunc("GET /nudges/{id}", h.NudgeDetailPage)
+}
+
+// =============================================================================
+// Autenticación del operador
+// =============================================================================
+
+// LoginPage muestra el formulario de acceso del operador.
+func (h *Handler) LoginPage(w http.ResponseWriter, r *http.Request) {
+	h.renderLogin(w, r, http.StatusOK, "")
+}
+
+// Login autentica al operador configurado y emite la cookie de sesión segura.
+// El mensaje de error es genérico e idéntico para usuario o contraseña
+// inválidos (sin enumeración de usuarios).
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	user := r.PostFormValue("username")
+	pass := r.PostFormValue("password")
+
+	if h.auth.ValidCredentials(user, pass) {
+		token, expires := h.auth.NewSession()
+		h.auth.SetSessionCookie(w, token, expires)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if wantsHTML(r) {
+		h.renderLogin(w, r, http.StatusUnauthorized, "Credenciales inválidas")
+		return
+	}
+	writeJSONStatus(w, http.StatusUnauthorized, map[string]string{"error": "credenciales inválidas"})
+}
+
+// Logout invalida la cookie de sesión y vuelve al login. Se permite sin sesión
+// válida (la limpieza de cookie es idempotente).
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	h.auth.ClearSessionCookie(w)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// renderLogin renderiza la página de login con un mensaje de error opcional.
+func (h *Handler) renderLogin(w http.ResponseWriter, r *http.Request, status int, errMsg string) {
+	tmpl, err := template.New("login.html").Funcs(templateFuncs).ParseFiles("web/templates/login.html")
+	if err != nil {
+		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "error interno"})
+		return
+	}
+	w.WriteHeader(status)
+	_ = tmpl.Execute(w, map[string]interface{}{"Error": errMsg})
 }
 
 // =============================================================================
