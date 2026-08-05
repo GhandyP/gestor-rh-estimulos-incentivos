@@ -10,8 +10,16 @@ import (
 )
 
 func (s *Store) CreateEmpleado(ctx context.Context, e *domain.Empleado) error {
+	return createEmpleado(ctx, s.db, e)
+}
+
+func (s *Store) CreateEmpleadoTx(ctx context.Context, tx *sql.Tx, e *domain.Empleado) error {
+	return createEmpleado(ctx, tx, e)
+}
+
+func createEmpleado(ctx context.Context, db execer, e *domain.Empleado) error {
 	now := time.Now().UTC()
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO empleados (nombre, email, cargo, departamento, fecha_ingreso, activo, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.Nombre, e.Email, e.Cargo, e.Departamento, e.FechaIngreso.Format(time.RFC3339), e.Activo, now, now,
@@ -27,15 +35,12 @@ func (s *Store) CreateEmpleado(ctx context.Context, e *domain.Empleado) error {
 }
 
 func (s *Store) CreateEmpleadoConPerfil(ctx context.Context, e *domain.Empleado, p *domain.PerfilMAP) error {
-	return s.WithTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
-		if err := s.CreateEmpleado(ctx, e); err != nil {
+	return s.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
 			return err
 		}
 		p.EmpleadoID = e.ID
-		if err := s.CreatePerfilMAP(ctx, p); err != nil {
-			return err
-		}
-		return nil
+		return s.CreatePerfilMAPTx(ctx, tx, p)
 	})
 }
 
@@ -107,8 +112,16 @@ func (s *Store) DeleteEmpleado(ctx context.Context, id int64) error {
 // --- PerfilMAP ---
 
 func (s *Store) CreatePerfilMAP(ctx context.Context, p *domain.PerfilMAP) error {
+	return createPerfilMAP(ctx, s.db, p)
+}
+
+func (s *Store) CreatePerfilMAPTx(ctx context.Context, tx *sql.Tx, p *domain.PerfilMAP) error {
+	return createPerfilMAP(ctx, tx, p)
+}
+
+func createPerfilMAP(ctx context.Context, db execer, p *domain.PerfilMAP) error {
 	now := time.Now().UTC()
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO perfiles_map (empleado_id, motivacion, habilidad, prompt, sensibilidad, confiabilidad, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		p.EmpleadoID, p.Motivacion, p.Habilidad, p.Prompt, p.Sensibilidad, p.Confiabilidad, now,

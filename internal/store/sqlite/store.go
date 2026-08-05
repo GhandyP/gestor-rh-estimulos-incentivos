@@ -71,15 +71,27 @@ func (s *Store) migrate() error {
 	return nil
 }
 
-func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context, tx *sql.Tx) error) error {
+func (s *Store) WithTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
-	if err := fn(ctx, tx); err != nil {
+	if err := fn(tx); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// execer es el subconjunto de *sql.DB y *sql.Tx usado para escrituras,
+// lo que permite compartir la lógica de inserción entre ambos.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// queryer es el subconjunto de *sql.DB y *sql.Tx usado para lecturas.
+type queryer interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }

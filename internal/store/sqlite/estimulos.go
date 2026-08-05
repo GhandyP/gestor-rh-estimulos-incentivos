@@ -110,25 +110,51 @@ func (s *Store) ListEstimulosPendientes(ctx context.Context) ([]domain.Estimulo,
 	return estimulos, rows.Err()
 }
 
-func (s *Store) ApplyEstimulo(ctx context.Context, id int64) error {
-	now := time.Now().UTC()
-	_, err := s.db.ExecContext(ctx,
+// TransitionEstimuloTx marca un estímulo como aplicado de forma condicional
+// dentro de la transacción. Solo transiciona estímulos pendientes; retorna
+// true si la transición ocurrió y false si el estímulo ya no estaba pendiente.
+func (s *Store) TransitionEstimuloTx(ctx context.Context, tx *sql.Tx, id int64, at time.Time) (bool, error) {
+	res, err := tx.ExecContext(ctx,
 		`UPDATE estimulos SET estado='aplicado', fecha_aplicado=? WHERE id=? AND estado='pendiente'`,
-		now.Format(time.RFC3339), id,
+		at.Format(time.RFC3339), id,
 	)
-	return err
+	if err != nil {
+		return false, fmt.Errorf("transition estimulo: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("transition estimulo rows: %w", err)
+	}
+	return n > 0, nil
+}
+
+// ApplyEstimulo es un envoltorio de transacción para TransitionEstimuloTx,
+// preservado mientras el service migra al flujo transaccional completo.
+func (s *Store) ApplyEstimulo(ctx context.Context, id int64) error {
+	return s.WithTx(ctx, func(tx *sql.Tx) error {
+		_, err := s.TransitionEstimuloTx(ctx, tx, id, time.Now().UTC())
+		return err
+	})
 }
 
 // Umbrales
 
 func (s *Store) CreateUmbral(ctx context.Context, u *domain.Umbral) error {
+	return createUmbral(ctx, s.db, u)
+}
+
+func (s *Store) CreateUmbralTx(ctx context.Context, tx *sql.Tx, u *domain.Umbral) error {
+	return createUmbral(ctx, tx, u)
+}
+
+func createUmbral(ctx context.Context, db execer, u *domain.Umbral) error {
 	now := time.Now().UTC()
 	var fechaUlt *string
 	if u.FechaUltimoEstimulo != nil {
 		f := u.FechaUltimoEstimulo.Format(time.RFC3339)
 		fechaUlt = &f
 	}
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO umbrales (empleado_id, umbral_absoluto, umbral_diferencial, ultimo_estimulo, fecha_ultimo_estimulo, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		u.EmpleadoID, u.UmbralAbsoluto, u.UmbralDiferencial, u.UltimoEstimulo, fechaUlt, now,
@@ -143,10 +169,18 @@ func (s *Store) CreateUmbral(ctx context.Context, u *domain.Umbral) error {
 }
 
 func (s *Store) GetUmbral(ctx context.Context, empleadoID int64) (*domain.Umbral, error) {
+	return getUmbral(ctx, s.db, empleadoID)
+}
+
+func (s *Store) GetUmbralTx(ctx context.Context, tx *sql.Tx, empleadoID int64) (*domain.Umbral, error) {
+	return getUmbral(ctx, tx, empleadoID)
+}
+
+func getUmbral(ctx context.Context, db queryer, empleadoID int64) (*domain.Umbral, error) {
 	u := &domain.Umbral{}
 	var updatedAt string
 	var fechaUltimo sql.NullString
-	err := s.db.QueryRowContext(ctx,
+	err := db.QueryRowContext(ctx,
 		`SELECT id, empleado_id, umbral_absoluto, umbral_diferencial, ultimo_estimulo, fecha_ultimo_estimulo, updated_at
 		 FROM umbrales WHERE empleado_id = ?`, empleadoID,
 	).Scan(&u.ID, &u.EmpleadoID, &u.UmbralAbsoluto, &u.UmbralDiferencial, &u.UltimoEstimulo, &fechaUltimo, &updatedAt)
@@ -165,13 +199,21 @@ func (s *Store) GetUmbral(ctx context.Context, empleadoID int64) (*domain.Umbral
 }
 
 func (s *Store) UpdateUmbral(ctx context.Context, u *domain.Umbral) error {
+	return updateUmbral(ctx, s.db, u)
+}
+
+func (s *Store) UpdateUmbralTx(ctx context.Context, tx *sql.Tx, u *domain.Umbral) error {
+	return updateUmbral(ctx, tx, u)
+}
+
+func updateUmbral(ctx context.Context, db execer, u *domain.Umbral) error {
 	now := time.Now().UTC()
 	var fechaUlt *string
 	if u.FechaUltimoEstimulo != nil {
 		f := u.FechaUltimoEstimulo.Format(time.RFC3339)
 		fechaUlt = &f
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`UPDATE umbrales SET umbral_absoluto=?, umbral_diferencial=?, ultimo_estimulo=?, fecha_ultimo_estimulo=?, updated_at=?
 		 WHERE id=?`,
 		u.UmbralAbsoluto, u.UmbralDiferencial, u.UltimoEstimulo, fechaUlt, now, u.ID,
@@ -186,7 +228,15 @@ func (s *Store) UpdateUmbral(ctx context.Context, u *domain.Umbral) error {
 // Historial
 
 func (s *Store) AddHistorial(ctx context.Context, umbralID int64, p domain.PuntoHistorial) error {
-	_, err := s.db.ExecContext(ctx,
+	return addHistorial(ctx, s.db, umbralID, p)
+}
+
+func (s *Store) AddHistorialTx(ctx context.Context, tx *sql.Tx, umbralID int64, p domain.PuntoHistorial) error {
+	return addHistorial(ctx, tx, umbralID, p)
+}
+
+func addHistorial(ctx context.Context, db execer, umbralID int64, p domain.PuntoHistorial) error {
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO historial_estimulos (umbral_id, fecha, intensidad, respuesta_map, tipo) VALUES (?, ?, ?, ?, ?)`,
 		umbralID, p.Fecha.Format(time.RFC3339), p.Intensidad, p.RespuestaMAP, p.Tipo,
 	)
@@ -194,7 +244,15 @@ func (s *Store) AddHistorial(ctx context.Context, umbralID int64, p domain.Punto
 }
 
 func (s *Store) GetHistorial(ctx context.Context, umbralID int64) ([]domain.PuntoHistorial, error) {
-	rows, err := s.db.QueryContext(ctx,
+	return getHistorial(ctx, s.db, umbralID)
+}
+
+func (s *Store) GetHistorialTx(ctx context.Context, tx *sql.Tx, umbralID int64) ([]domain.PuntoHistorial, error) {
+	return getHistorial(ctx, tx, umbralID)
+}
+
+func getHistorial(ctx context.Context, db queryer, umbralID int64) ([]domain.PuntoHistorial, error) {
+	rows, err := db.QueryContext(ctx,
 		`SELECT fecha, intensidad, respuesta_map, COALESCE(tipo, '') FROM historial_estimulos WHERE umbral_id = ? ORDER BY fecha`, umbralID,
 	)
 	if err != nil {
