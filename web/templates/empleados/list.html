@@ -31,14 +31,6 @@
                 </form>
                 <button class="btn btn-sm btn-danger" hx-delete="/api/empleados/{{.ID}}" hx-target="closest tr" hx-swap="delete" hx-confirm="¿Eliminar a {{.Nombre}}?" style="margin-left:4px">🗑</button>
             </td>
-                    <button class="btn btn-sm btn-danger"
-                    hx-delete="/api/empleados/{{.ID}}"
-                    hx-target="closest tr"
-                    hx-swap="delete"
-                    hx-confirm="¿Eliminar a {{.Nombre}}?">
-                🗑
-            </button>
-            </td>
         </tr>
         <tr id="recomendacion-{{.ID}}" style="display:none"><td colspan="6"></td></tr>
         {{end}}
