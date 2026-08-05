@@ -1,17 +1,20 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Umbral modela los umbrales psicofísicos de un empleado frente a estímulos.
 type Umbral struct {
-	ID               int64     `json:"id"`
-	EmpleadoID       int64     `json:"empleado_id"`
-	UmbralAbsoluto   float64   `json:"umbral_absoluto"`   // Intensidad mínima para ser detectado (0.0 - 1.0)
-	UmbralDiferencial float64  `json:"umbral_diferencial"` // Constante de Weber personal (ej: 0.15)
-	UltimoEstimulo   float64   `json:"ultimo_estimulo"`   // Intensidad del último estímulo recibido
-	FechaUltimoEstimulo *time.Time `json:"fecha_ultimo_estimulo,omitempty"`
-	Historial        []PuntoHistorial `json:"historial,omitempty"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                  int64            `json:"id"`
+	EmpleadoID          int64            `json:"empleado_id"`
+	UmbralAbsoluto      float64          `json:"umbral_absoluto"`    // Intensidad mínima para ser detectado (0.0 - 1.0)
+	UmbralDiferencial   float64          `json:"umbral_diferencial"` // Constante de Weber personal (ej: 0.15)
+	UltimoEstimulo      float64          `json:"ultimo_estimulo"`    // Intensidad del último estímulo recibido
+	FechaUltimoEstimulo *time.Time       `json:"fecha_ultimo_estimulo,omitempty"`
+	Historial           []PuntoHistorial `json:"historial,omitempty"`
+	UpdatedAt           time.Time        `json:"updated_at"`
 }
 
 // PuntoHistorial registra un estímulo aplicado y la respuesta observada.
@@ -53,4 +56,24 @@ func (u Umbral) Fatiga(frecuenciaMaxima int, ventanaDias int) bool {
 		}
 	}
 	return count >= frecuenciaMaxima
+}
+
+// Validate comprueba las invariantes de un umbral antes de persistirlo.
+func (u *Umbral) Validate() error {
+	if u.EmpleadoID <= 0 {
+		return fmt.Errorf("empleado_id es requerido")
+	}
+	if u.UmbralAbsoluto < 0 || u.UmbralAbsoluto > 1 {
+		return fmt.Errorf("umbral_absoluto debe estar entre 0 y 1")
+	}
+	if u.UmbralDiferencial < 0 || u.UmbralDiferencial > 1 {
+		return fmt.Errorf("umbral_diferencial debe estar entre 0 y 1")
+	}
+	if u.UltimoEstimulo < 0 || u.UltimoEstimulo > 1 {
+		return fmt.Errorf("ultimo_estimulo debe estar entre 0 y 1")
+	}
+	if (u.UltimoEstimulo > 0) != (u.FechaUltimoEstimulo != nil) {
+		return fmt.Errorf("ultimo_estimulo y fecha_ultimo_estimulo deben registrarse juntos")
+	}
+	return nil
 }
