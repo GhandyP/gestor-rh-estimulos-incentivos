@@ -3,9 +3,10 @@
     <p style="color:var(--muted);font-size:0.88rem;margin-bottom:12px">
         Registrá la respuesta observada del empleado a este estímulo (0.0 = sin efecto, 1.0 = máximo efecto).
     </p>
-    <form hx-post="/api/estimulos/{{.ID}}/aplicar" hx-ext="json-enc"
+    <form hx-post="/api/estimulos/{{.Estimulo.ID}}/aplicar" hx-ext="json-enc"
           hx-target="#apply-form"
           hx-swap="outerHTML">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label">Respuesta MAP observada (0.0 - 1.0)</label>

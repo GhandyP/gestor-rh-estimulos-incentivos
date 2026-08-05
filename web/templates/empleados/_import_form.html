@@ -8,6 +8,7 @@
           hx-post="/api/empleados/import"
           hx-target="#import-result"
           hx-swap="innerHTML">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <div class="form-group">
             <label class="form-label">Archivo CSV</label>
             <input class="form-input" type="file" name="file" accept=".csv" required>

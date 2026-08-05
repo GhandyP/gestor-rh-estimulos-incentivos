@@ -152,6 +152,15 @@ func (h *Handler) renderLogin(w http.ResponseWriter, r *http.Request, status int
 	_ = tmpl.Execute(w, map[string]interface{}{"Error": errMsg})
 }
 
+// csrfFor devuelve el token CSRF ligado a la sesión autenticada de la request,
+// para inyectarlo en páginas (meta tag) y formularios de mutación (hidden input).
+func (h *Handler) csrfFor(r *http.Request) string {
+	if sess := sessionFromContext(r.Context()); sess != nil {
+		return h.auth.CSRFToken(sess)
+	}
+	return ""
+}
+
 // =============================================================================
 // Páginas HTML
 // =============================================================================
@@ -168,6 +177,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"Empleados":  empleados,
 		"Incentivos": incentivos,
 		"Nudges":     nudges,
+		"CSRFToken":  h.csrfFor(r),
 	}
 
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/dashboard.html")
@@ -183,6 +193,7 @@ func (h *Handler) EmpleadosPage(w http.ResponseWriter, r *http.Request) {
 	empleados, _ := h.Svc.ListEmpleados(r.Context())
 	data := map[string]interface{}{
 		"Empleados": empleados,
+		"CSRFToken": h.csrfFor(r),
 	}
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/empleados/list.html")
 	if err != nil {
@@ -207,12 +218,16 @@ func (h *Handler) EmpleadoDetailPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	data := map[string]interface{}{
+		"Detail":    detail,
+		"CSRFToken": h.csrfFor(r),
+	}
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/empleados/detail.html")
 	if err != nil {
 		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tmpl.ExecuteTemplate(w, "base", detail)
+	tmpl.ExecuteTemplate(w, "base", data)
 }
 
 // IncentivosPage renderiza la lista de incentivos.
@@ -220,6 +235,7 @@ func (h *Handler) IncentivosPage(w http.ResponseWriter, r *http.Request) {
 	incentivos, _ := h.Svc.ListIncentivos(r.Context())
 	data := map[string]interface{}{
 		"Incentivos": incentivos,
+		"CSRFToken":  h.csrfFor(r),
 	}
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/incentivos/list.html")
 	if err != nil {
@@ -233,7 +249,8 @@ func (h *Handler) IncentivosPage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) NudgesPage(w http.ResponseWriter, r *http.Request) {
 	nudges, _ := h.Svc.ListNudges(r.Context())
 	data := map[string]interface{}{
-		"Nudges": nudges,
+		"Nudges":    nudges,
+		"CSRFToken": h.csrfFor(r),
 	}
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/nudges/list.html", "web/templates/nudges/_card.html")
 	if err != nil {
@@ -254,6 +271,7 @@ func (h *Handler) EstimulosPage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Estimulos": estimulos,
 		"Estado":    estado,
+		"CSRFToken": h.csrfFor(r),
 	}
 
 	// HTMX: retornar solo la tabla con tabs
@@ -410,7 +428,7 @@ func (h *Handler) EmpleadoFormAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Formulario no disponible", http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, nil)
+	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // PerfilFormAPI retorna un formulario HTML parcial para editar el perfil MAP.
@@ -433,7 +451,10 @@ func (h *Handler) PerfilFormAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Formulario no disponible", http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, detail.Perfil)
+	tmpl.Execute(w, map[string]interface{}{
+		"Perfil":    detail.Perfil,
+		"CSRFToken": h.csrfFor(r),
+	})
 }
 
 // ImportCSVAPI importa empleados desde un archivo CSV.
@@ -764,7 +785,10 @@ func (h *Handler) EstimuloApplyFormAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Formulario no disponible", http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, estimulo)
+	tmpl.Execute(w, map[string]interface{}{
+		"Estimulo":  estimulo,
+		"CSRFToken": h.csrfFor(r),
+	})
 }
 
 // =============================================================================
@@ -1047,7 +1071,7 @@ func (h *Handler) ImportFormAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, nil)
+	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // IncentivoFormAPI retorna el partial HTML del formulario de creación de incentivo.
@@ -1057,7 +1081,7 @@ func (h *Handler) IncentivoFormAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, nil)
+	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // NudgeFormAPI retorna el partial HTML del formulario de creación de nudge.
@@ -1067,7 +1091,7 @@ func (h *Handler) NudgeFormAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, nil)
+	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // ToggleNudgeAPI invierte el estado activo/inactivo de un nudge.
@@ -1123,12 +1147,16 @@ func (h *Handler) IncentivoDetailPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	data := map[string]interface{}{
+		"Detail":    detail,
+		"CSRFToken": h.csrfFor(r),
+	}
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/incentivos/detail.html")
 	if err != nil {
 		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tmpl.ExecuteTemplate(w, "base", detail)
+	tmpl.ExecuteTemplate(w, "base", data)
 }
 
 // NudgeDetailPage renderiza la página de detalle de un nudge.
@@ -1146,7 +1174,10 @@ func (h *Handler) NudgeDetailPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := map[string]interface{}{"Nudge": nudge}
+	data := map[string]interface{}{
+		"Nudge":     nudge,
+		"CSRFToken": h.csrfFor(r),
+	}
 	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/nudges/detail.html")
 	if err != nil {
 		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)

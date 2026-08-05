@@ -1,6 +1,7 @@
 <div class="form-inline" id="nudge-form">
     <h3>Nuevo Nudge</h3>
     <form hx-post="/api/nudges" hx-ext="json-enc" hx-target="#main-content" hx-swap="outerHTML">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label">Nombre</label>

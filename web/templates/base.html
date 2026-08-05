@@ -4,8 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{block "title" .}}RRHH · Estímulos e Incentivos{{end}}</title>
+    <meta name="csrf-token" content="{{.CSRFToken}}">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
+    <script>
+    // Inyecta el token CSRF ligado a la sesión en toda request HTMX de mutación.
+    document.addEventListener('htmx:configRequest', function(evt) {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.getAttribute('content')) {
+            evt.detail.headers['X-CSRF-Token'] = meta.getAttribute('content');
+        }
+    });
+    </script>
     <style>
         :root {
             --bg: #f8f9fa; --card: #ffffff; --border: #dee2e6;
@@ -198,6 +208,9 @@
                 <a href="/incentivos" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Incentivos</a>
                 <a href="/nudges" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Nudges</a>
                 <a href="/estimulos" hx-boost="true" hx-target="#main-content" hx-select="#main-content">Estímulos</a>
+                <form action="/logout" method="post" style="display:inline">
+                    <button type="submit" class="btn btn-sm" style="border:none;background:transparent;color:var(--muted);cursor:pointer">Salir</button>
+                </form>
             </nav>
         </div>
     </header>

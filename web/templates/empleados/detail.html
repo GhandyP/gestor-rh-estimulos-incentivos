@@ -3,7 +3,7 @@
     <a href="/empleados" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-outline">← Volver a Empleados</a>
 </div>
 
-{{with .Empleado}}
+{{with .Detail.Empleado}}
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
         <div>
@@ -31,7 +31,7 @@
 
 <div id="recomendacion-result" style="margin-bottom:20px"></div>
 
-{{with .Perfil}}
+{{with .Detail.Perfil}}
 <div class="card">
     <h2>🧠 Perfil MAP</h2>
     <div class="grid-3">
@@ -62,7 +62,7 @@
 </div>
 {{end}}
 
-{{with .Umbral}}
+{{with .Detail.Umbral}}
 <div class="card">
     <h2>📐 Umbral Psicométrico</h2>
     <div class="detail-grid">
@@ -77,13 +77,13 @@
 </div>
 {{end}}
 
-{{if .Historial}}
+{{if .Detail.Historial}}
 <div class="card">
     <h2>📜 Historial de Estímulos</h2>
     <table>
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Intensidad</th><th>Respuesta MAP</th></tr></thead>
         <tbody>
-        {{range .Historial}}
+        {{range .Detail.Historial}}
         <tr>
             <td>{{.Fecha}}</td>
             <td><span class="badge badge-info">{{.Tipo}}</span></td>

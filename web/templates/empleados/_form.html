@@ -1,6 +1,7 @@
 <div class="form-inline" id="empleado-form">
     <h3>Nuevo Empleado</h3>
     <form hx-post="/api/empleados" hx-ext="json-enc" hx-target="#empleados-tbody" hx-swap="beforeend" hx-on::after-request="this.closest('#empleado-form').remove()">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label">Nombre</label>

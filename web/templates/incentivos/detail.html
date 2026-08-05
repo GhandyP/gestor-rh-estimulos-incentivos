@@ -3,7 +3,7 @@
     <a href="/incentivos" hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="btn btn-outline">← Volver a Incentivos</a>
 </div>
 
-{{with .Incentivo}}
+{{with .Detail.Incentivo}}
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
         <div>
@@ -26,13 +26,13 @@
 </div>
 {{end}}
 
-{{if .Elegibilidades}}
+{{if .Detail.Elegibilidades}}
 <div class="card">
     <h2>📋 Criterios de Elegibilidad</h2>
     <table>
         <thead><tr><th>Campo</th><th>Operador</th><th>Valor</th></tr></thead>
         <tbody>
-        {{range .Elegibilidades}}
+        {{range .Detail.Elegibilidades}}
         <tr>
             <td><strong>{{.Campo}}</strong></td>
             <td><code>{{.Operador}}</code></td>
