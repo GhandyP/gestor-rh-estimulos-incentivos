@@ -1,0 +1,48 @@
+# CI reproducible: test/build/vet/gofmt fijados a la raíz del repo.
+# Cada paso falla en cualquier salida no cero (default de Actions); el workflow
+# NUNCA escribe en el repo (sin commit/push) y no compone input de usuario.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: ${{ github.workspace }}
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        run: go test ./... -count=1 -timeout 120s
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Format
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Archivos no formateados por gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
