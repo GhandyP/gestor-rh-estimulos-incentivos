@@ -1,9 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"strconv"
@@ -12,20 +13,42 @@ import (
 	"estimulos-incentivos/internal/service"
 )
 
-// templateFuncs son funciones auxiliares disponibles en todos los templates.
-var templateFuncs = template.FuncMap{
-	"percent": func(v float64) string { return fmt.Sprintf("%.0f", v*100) },
-}
-
 // Handler maneja rutas HTTP para el sistema de Estímulos e Incentivos.
 type Handler struct {
-	Svc  *service.Service
-	auth *Authenticator
+	Svc       *service.Service
+	auth      *Authenticator
+	templates *TemplateSet
 }
 
 // New crea un nuevo Handler con el límite de seguridad de operador.
 func New(svc *service.Service, auth *Authenticator) *Handler {
 	return &Handler{Svc: svc, auth: auth}
+}
+
+// SetTemplates inyecta el set de templates parseado UNA VEZ en el arranque
+// (cwd-independiente). Sin él, el render devuelve error interno.
+func (h *Handler) SetTemplates(ts *TemplateSet) {
+	h.templates = ts
+}
+
+// execute es el punto único de render: usa el set pre-parsado del arranque.
+func (h *Handler) execute(w io.Writer, page, name string, data any) error {
+	if h.templates == nil {
+		return errors.New("templates no cargados en el arranque")
+	}
+	return h.templates.execute(w, page, name, data)
+}
+
+// renderHTML renderiza a un buffer y recién entonces escribe la respuesta:
+// si el template falla, se responde un 500 genérico (mapeo de errores seguro,
+// sin detalles internos) sin escribir salida parcial.
+func (h *Handler) renderHTML(w http.ResponseWriter, page, name string, data any) {
+	var buf bytes.Buffer
+	if err := h.execute(&buf, page, name, data); err != nil {
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+	_, _ = w.Write(buf.Bytes())
 }
 
 // RegisterRoutes registra todas las rutas HTML y API en el mux.
@@ -143,13 +166,13 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // renderLogin renderiza la página de login con un mensaje de error opcional.
 func (h *Handler) renderLogin(w http.ResponseWriter, r *http.Request, status int, errMsg string) {
-	tmpl, err := template.New("login.html").Funcs(templateFuncs).ParseFiles("web/templates/login.html")
-	if err != nil {
+	var buf bytes.Buffer
+	if err := h.execute(&buf, "login", "", map[string]interface{}{"Error": errMsg}); err != nil {
 		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": "error interno"})
 		return
 	}
 	w.WriteHeader(status)
-	_ = tmpl.Execute(w, map[string]interface{}{"Error": errMsg})
+	_, _ = w.Write(buf.Bytes())
 }
 
 // csrfFor devuelve el token CSRF ligado a la sesión autenticada de la request,
@@ -179,13 +202,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"Nudges":     nudges,
 		"CSRFToken":  h.csrfFor(r),
 	}
-
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/dashboard.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "dashboard", "base", data)
 }
 
 // EmpleadosPage renderiza la lista de empleados.
@@ -195,12 +212,7 @@ func (h *Handler) EmpleadosPage(w http.ResponseWriter, r *http.Request) {
 		"Empleados": empleados,
 		"CSRFToken": h.csrfFor(r),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/empleados/list.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "empleados-list", "base", data)
 }
 
 // EmpleadoDetailPage renderiza el detalle de un empleado.
@@ -222,12 +234,7 @@ func (h *Handler) EmpleadoDetailPage(w http.ResponseWriter, r *http.Request) {
 		"Detail":    detail,
 		"CSRFToken": h.csrfFor(r),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/empleados/detail.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "empleados-detail", "base", data)
 }
 
 // IncentivosPage renderiza la lista de incentivos.
@@ -237,12 +244,7 @@ func (h *Handler) IncentivosPage(w http.ResponseWriter, r *http.Request) {
 		"Incentivos": incentivos,
 		"CSRFToken":  h.csrfFor(r),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/incentivos/list.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "incentivos-list", "base", data)
 }
 
 // NudgesPage renderiza la lista de nudges.
@@ -252,12 +254,7 @@ func (h *Handler) NudgesPage(w http.ResponseWriter, r *http.Request) {
 		"Nudges":    nudges,
 		"CSRFToken": h.csrfFor(r),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/nudges/list.html", "web/templates/nudges/_card.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "nudges-list", "base", data)
 }
 
 // EstimulosPage renderiza la lista de estímulos con filtro por estado.
@@ -276,21 +273,11 @@ func (h *Handler) EstimulosPage(w http.ResponseWriter, r *http.Request) {
 
 	// HTMX: retornar solo la tabla con tabs
 	if r.Header.Get("HX-Request") == "true" {
-		tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/estimulos/_table.html")
-		if err != nil {
-			http.Error(w, "Error al cargar template", http.StatusInternalServerError)
-			return
-		}
-		tmpl.Execute(w, data)
+		h.renderHTML(w, "estimulos-table", "", data)
 		return
 	}
 
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/estimulos/list.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "estimulos-list", "base", data)
 }
 
 // =============================================================================
@@ -423,12 +410,7 @@ func (h *Handler) UpdatePerfilMAPAPI(w http.ResponseWriter, r *http.Request) {
 
 // EmpleadoFormAPI retorna un formulario HTML parcial para crear empleado.
 func (h *Handler) EmpleadoFormAPI(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/empleados/_form.html")
-	if err != nil {
-		http.Error(w, "Formulario no disponible", http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
+	h.renderHTML(w, "empleados-form", "", map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // PerfilFormAPI retorna un formulario HTML parcial para editar el perfil MAP.
@@ -446,12 +428,7 @@ func (h *Handler) PerfilFormAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/empleados/_perfil_form.html")
-	if err != nil {
-		http.Error(w, "Formulario no disponible", http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, map[string]interface{}{
+	h.renderHTML(w, "empleados-perfil-form", "", map[string]interface{}{
 		"Perfil":    detail.Perfil,
 		"CSRFToken": h.csrfFor(r),
 	})
@@ -481,12 +458,7 @@ func (h *Handler) ImportCSVAPI(w http.ResponseWriter, r *http.Request) {
 	// HTMX: retornar resumen HTML
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("X-Toast", fmt.Sprintf("✓ %d empleados importados, %d errores", creados, len(errores)))
-		tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/empleados/_import_result.html")
-		if err != nil {
-			http.Error(w, "Error al cargar template", http.StatusInternalServerError)
-			return
-		}
-		tmpl.Execute(w, map[string]interface{}{
+		h.renderHTML(w, "empleados-import-result", "", map[string]interface{}{
 			"Creados": creados,
 			"Errores": errores,
 		})
@@ -780,12 +752,7 @@ func (h *Handler) EstimuloApplyFormAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/estimulos/_apply_form.html")
-	if err != nil {
-		http.Error(w, "Formulario no disponible", http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, map[string]interface{}{
+	h.renderHTML(w, "estimulos-apply-form", "", map[string]interface{}{
 		"Estimulo":  estimulo,
 		"CSRFToken": h.csrfFor(r),
 	})
@@ -827,12 +794,7 @@ func (h *Handler) CreateEmpleadoAPI(w http.ResponseWriter, r *http.Request) {
 	// HTMX: retornar fila HTML para insertar en la tabla
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("X-Toast", "✓ Empleado creado")
-		tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/empleados/_row.html")
-		if err != nil {
-			http.Error(w, "Error al cargar template", http.StatusInternalServerError)
-			return
-		}
-		tmpl.Execute(w, e)
+		h.renderHTML(w, "empleados-row", "", e)
 		return
 	}
 
@@ -877,12 +839,7 @@ func (h *Handler) RecomendarAPI(w http.ResponseWriter, r *http.Request) {
 
 	// HTMX: retornar HTML parcial
 	if r.Header.Get("HX-Request") == "true" {
-		tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/_recomendacion.html")
-		if err != nil {
-			http.Error(w, "Error al cargar template de recomendación", http.StatusInternalServerError)
-			return
-		}
-		tmpl.Execute(w, result)
+		h.renderHTML(w, "recomendacion", "", result)
 		return
 	}
 
@@ -1023,75 +980,40 @@ func (h *Handler) DashboardStatsAPI(w http.ResponseWriter, r *http.Request) {
 		"IncentivosActivos": len(incentivos),
 		"NudgesActivos":     len(nudges),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/_stats.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, data)
+	h.renderHTML(w, "stats", "", data)
 }
 
 // DashboardRiesgosAPI retorna el partial HTML de zona de riesgo.
 func (h *Handler) DashboardRiesgosAPI(w http.ResponseWriter, r *http.Request) {
 	result, _ := h.Svc.Analizar(r.Context())
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/_riesgos.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, result)
+	h.renderHTML(w, "riesgos", "", result)
 }
 
 // DashboardDistribucionAPI retorna el partial HTML de distribución MAP.
 func (h *Handler) DashboardDistribucionAPI(w http.ResponseWriter, r *http.Request) {
 	result, _ := h.Svc.Analizar(r.Context())
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/_distribucion.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, result)
+	h.renderHTML(w, "distribucion", "", result)
 }
 
 // DashboardEfectividadAPI retorna el partial HTML de efectividad.
 func (h *Handler) DashboardEfectividadAPI(w http.ResponseWriter, r *http.Request) {
 	result, _ := h.Svc.Analizar(r.Context())
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/_efectividad.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, result)
+	h.renderHTML(w, "efectividad", "", result)
 }
 
 // ImportFormAPI retorna el partial HTML del formulario de importación CSV.
 func (h *Handler) ImportFormAPI(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/empleados/_import_form.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
+	h.renderHTML(w, "empleados-import-form", "", map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // IncentivoFormAPI retorna el partial HTML del formulario de creación de incentivo.
 func (h *Handler) IncentivoFormAPI(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/incentivos/_form.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
+	h.renderHTML(w, "incentivos-form", "", map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // NudgeFormAPI retorna el partial HTML del formulario de creación de nudge.
 func (h *Handler) NudgeFormAPI(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/nudges/_form.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.Execute(w, map[string]interface{}{"CSRFToken": h.csrfFor(r)})
+	h.renderHTML(w, "nudges-form", "", map[string]interface{}{"CSRFToken": h.csrfFor(r)})
 }
 
 // ToggleNudgeAPI invierte el estado activo/inactivo de un nudge.
@@ -1107,13 +1029,12 @@ func (h *Handler) ToggleNudgeAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Devolver la card actualizada
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/nudges/_card.html")
-	if err != nil {
+	// Devolver la card actualizada. El defecto preexistente (nudges/_card.html
+	// no define "nudge-card") hace fallar la ejecución; se responde el nudge
+	// en JSON en lugar de un 200 vacío.
+	if err := h.execute(w, "nudges-card", "nudge-card", nudge); err != nil {
 		writeJSON(w, nudge)
-		return
 	}
-	tmpl.ExecuteTemplate(w, "nudge-card", nudge)
 }
 
 // DeleteEmpleadoAPI elimina un empleado.
@@ -1151,12 +1072,7 @@ func (h *Handler) IncentivoDetailPage(w http.ResponseWriter, r *http.Request) {
 		"Detail":    detail,
 		"CSRFToken": h.csrfFor(r),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/incentivos/detail.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "incentivos-detail", "base", data)
 }
 
 // NudgeDetailPage renderiza la página de detalle de un nudge.
@@ -1178,12 +1094,7 @@ func (h *Handler) NudgeDetailPage(w http.ResponseWriter, r *http.Request) {
 		"Nudge":     nudge,
 		"CSRFToken": h.csrfFor(r),
 	}
-	tmpl, err := template.New("").Funcs(templateFuncs).ParseFiles("web/templates/base.html", "web/templates/nudges/detail.html")
-	if err != nil {
-		http.Error(w, "Error al cargar templates: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tmpl.ExecuteTemplate(w, "base", data)
+	h.renderHTML(w, "nudges-detail", "base", data)
 }
 
 // =============================================================================
