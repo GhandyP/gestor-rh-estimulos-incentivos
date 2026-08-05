@@ -7,5 +7,5 @@ estimulos.db
 *.db-wal
 *.db-shm
 
-# Built binary
-server
+# Built binary (repo root only — must not ignore cmd/server/)
+/server
