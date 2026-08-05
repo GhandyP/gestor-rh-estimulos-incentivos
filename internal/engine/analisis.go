@@ -5,27 +5,27 @@ import (
 )
 
 type DistribucionMAP struct {
-	Depto         string  `json:"depto"`
-	PromedioM     float64 `json:"promedio_m"`
-	PromedioA     float64 `json:"promedio_a"`
-	PromedioP     float64 `json:"promedio_p"`
-	MAP           float64 `json:"map"`
-	TotalEmpleados int    `json:"total_empleados"`
+	Depto          string  `json:"depto"`
+	PromedioM      float64 `json:"promedio_m"`
+	PromedioA      float64 `json:"promedio_a"`
+	PromedioP      float64 `json:"promedio_p"`
+	MAP            float64 `json:"map"`
+	TotalEmpleados int     `json:"total_empleados"`
 }
 
 type EfectividadRow struct {
-	Tipo          string  `json:"tipo"`
-	TotalAplicados int    `json:"total_aplicados"`
-	TotalExitosos  int    `json:"total_exitosos"`
-	TasaExito     float64 `json:"tasa_exito"`
+	Tipo           string  `json:"tipo"`
+	TotalAplicados int     `json:"total_aplicados"`
+	TotalExitosos  int     `json:"total_exitosos"`
+	TasaExito      float64 `json:"tasa_exito"`
 }
 
 type AnalisisResult struct {
-	Distribuciones     []DistribucionMAP `json:"distribuciones"`
-	Efectividad        []EfectividadRow  `json:"efectividad"`
-	ZonaRiesgo         []RiesgoResult    `json:"zona_riesgo"`
-	TotalEmpleados     int               `json:"total_empleados"`
-	EmpleadosEnRiesgo  int               `json:"empleados_en_riesgo"`
+	Distribuciones    []DistribucionMAP `json:"distribuciones"`
+	Efectividad       []EfectividadRow  `json:"efectividad"`
+	ZonaRiesgo        []RiesgoResult    `json:"zona_riesgo"`
+	TotalEmpleados    int               `json:"total_empleados"`
+	EmpleadosEnRiesgo int               `json:"empleados_en_riesgo"`
 }
 
 // Analizar genera el análisis descriptivo del capital humano.

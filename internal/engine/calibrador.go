@@ -10,9 +10,9 @@ import (
 
 const (
 	defaultAbsoluteThreshold = 0.30
-	defaultWeberConstant    = 0.15
-	minConfidence           = 0.30
-	historyWindowDays       = 90
+	defaultWeberConstant     = 0.15
+	minConfidence            = 0.30
+	historyWindowDays        = 90
 )
 
 func CalibrarUmbral(u domain.Umbral, historial []domain.PuntoHistorial) domain.Umbral {
@@ -76,9 +76,9 @@ func CalibrarUmbral(u domain.Umbral, historial []domain.PuntoHistorial) domain.U
 
 func UmbralInicial(empleadoID int64) domain.Umbral {
 	return domain.Umbral{
-		EmpleadoID:       empleadoID,
-		UmbralAbsoluto:   defaultAbsoluteThreshold,
+		EmpleadoID:        empleadoID,
+		UmbralAbsoluto:    defaultAbsoluteThreshold,
 		UmbralDiferencial: defaultWeberConstant,
-		UpdatedAt:        time.Now().UTC(),
+		UpdatedAt:         time.Now().UTC(),
 	}
 }

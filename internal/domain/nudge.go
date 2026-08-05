@@ -6,10 +6,10 @@ import "time"
 type TipoNudge string
 
 const (
-	NudgeDefaults     TipoNudge = "defaults"
-	NudgeSocialProof  TipoNudge = "social_proof"
-	NudgeFraming      TipoNudge = "framing"
-	NudgeFriccion     TipoNudge = "friccion"
+	NudgeDefaults    TipoNudge = "defaults"
+	NudgeSocialProof TipoNudge = "social_proof"
+	NudgeFraming     TipoNudge = "framing"
+	NudgeFriccion    TipoNudge = "friccion"
 )
 
 // AmbitoNudge define si el nudge aplica a toda la organización o a un grupo específico.

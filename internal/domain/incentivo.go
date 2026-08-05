@@ -6,9 +6,9 @@ import "time"
 type TipoIncentivo string
 
 const (
-	IncentivoIdentidad          TipoIncentivo = "identidad"
-	IncentivoBeneficios         TipoIncentivo = "beneficios"
-	IncentivoFormacion          TipoIncentivo = "formacion"
+	IncentivoIdentidad           TipoIncentivo = "identidad"
+	IncentivoBeneficios          TipoIncentivo = "beneficios"
+	IncentivoFormacion           TipoIncentivo = "formacion"
 	IncentivoProyectoCorporativo TipoIncentivo = "proyecto_corporativo"
 )
 
@@ -27,10 +27,10 @@ type Incentivo struct {
 	Nombre         string         `json:"nombre"`
 	Descripcion    string         `json:"descripcion"`
 	Tipo           TipoIncentivo  `json:"tipo"`
-	Intensidad     float64        `json:"intensidad"`   // Cuánta motivación aporta (0.0 - 1.0)
-	Costo          float64        `json:"costo"`        // Costo estimado para la empresa
+	Intensidad     float64        `json:"intensidad"` // Cuánta motivación aporta (0.0 - 1.0)
+	Costo          float64        `json:"costo"`      // Costo estimado para la empresa
 	Disponibilidad Disponibilidad `json:"disponibilidad"`
-	Cupos          int            `json:"cupos"`        // Solo si es limitado
+	Cupos          int            `json:"cupos"` // Solo si es limitado
 	CuposUsados    int            `json:"cupos_usados"`
 	Activo         bool           `json:"activo"`
 	CreatedAt      time.Time      `json:"created_at"`
@@ -49,7 +49,7 @@ func (i Incentivo) HayCupos() bool {
 type Elegibilidad struct {
 	ID          int64  `json:"id"`
 	IncentivoID int64  `json:"incentivo_id"`
-	Campo       string `json:"campo"`  // Ej: "departamento", "cargo", "antiguedad_meses"
+	Campo       string `json:"campo"`    // Ej: "departamento", "cargo", "antiguedad_meses"
 	Operador    string `json:"operador"` // "eq", "gte", "lte"
 	Valor       string `json:"valor"`
 }
