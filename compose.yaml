@@ -1,0 +1,34 @@
+# Demo reproducible de una sola instancia: SQLite en volumen, healthcheck y
+# defaults de arranque seguros (credenciales de desarrollo reemplazables por
+# entorno). Sin orquestación adicional: un solo servicio, un solo operador.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: estimulos-incentivos:local
+    container_name: estimulos-incentivos
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DB_PATH: /data/estimulos.db
+      APP_ROOT: /app
+      # Defaults SOLO para demo local; el arranque advierte si se usan.
+      OPERATOR_USER: ${OPERATOR_USER:-admin}
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-dev-admin-password-change-me}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-session-secret-change-me-0123456789abcdef}
+      # HTTP plano local: sin Secure en la cookie (usar TLS o false en demos).
+      COOKIE_SECURE: "false"
+    volumes:
+      - estimulos-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  estimulos-data:

@@ -1,0 +1,11 @@
+# Build context mínimo y reproducible para la imagen Docker.
+.git
+.atl
+.pi
+openspec
+*.md
+*.db
+*.db-wal
+*.db-shm
+/server
+server
