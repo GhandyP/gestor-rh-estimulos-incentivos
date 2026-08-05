@@ -4,6 +4,14 @@ topic: "Sistema de Estímulos e Incentivos para RRHH"
 status: validated
 ---
 
+> **Nota (2026-08-05):** este documento conserva el razonamiento conceptual del modelo
+> conductual (Fogg B = M × A × P y umbrales psicofísicos). Para la arquitectura **tal como
+> está implementada y endurecida** (decisiones, validación, transacciones, migraciones,
+> seguridad, ciclo de vida, entrega Docker/CI, limitaciones y walkthrough), ver
+> [`design-production-hardening.md`](design-production-hardening.md). Las secciones de stack,
+> estructura de proyecto y persistencia se corrigieron para reflejar la implementación real;
+> PostgreSQL dejó de ser un objetivo (ver no-goals en el README).
+
 ## Problem Statement
 
 Recursos Humanos necesita una herramienta para mantener un **análisis descriptivo del capital humano** y generar **estímulos e incentivos personalizados** que mejoren el desempeño individual y organizacional.
@@ -21,7 +29,7 @@ El sistema se fundamenta en dos modelos teóricos:
 - **Go puro**: Todo el backend en Go con dependencias mínimas
 - **Stack simple**: SQLite sin CGO, HTML templates con HTMX, sin frameworks JS pesados
 - **Sin integraciones externas en MVP**: Los datos de empleados se cargan manualmente (no se conecta a ERP/nómina)
-- **Diseño portable**: La arquitectura debe permitir migrar SQLite → PostgreSQL sin reescribir lógica
+- **Alcance de una sola instancia**: Un solo operador confiable; sin SSO/OIDC, multi-tenancy, RBAC multi-rol, PostgreSQL, Kubernetes, jobs, ni ML (no-goals explícitos, ver README)
 
 ## Approach
 
@@ -102,7 +110,7 @@ INCENTIVOS             NUDGES           ESTÍMULOS
 │  └───────────────────────────────────────────────────────┘   │
 ├──────────────────────────────────────────────────────────────┤
 │                   CAPA DE PERSISTENCIA                       │
-│           SQLite (→ PostgreSQL para producción)              │
+│           SQLite (modernc.org/sqlite, sin CGO)                │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -256,63 +264,64 @@ RRHH define objetivo: "Mejorar retención en ingeniería"
 
 | Capa | Tecnología | Justificación |
 |------|------------|---------------|
-| Lenguaje | Go 1.22+ | Requerimiento explícito |
+| Lenguaje | Go 1.26 (CGO-free) | Binario estático y portable |
 | HTTP Router | `net/http` (enhanced mux) | Stdlib, sin dependencias |
 | Base de datos | SQLite vía `modernc.org/sqlite` | Sin CGO, portable, ideal para MVP |
-| Migraciones | `golang-migrate` | Compatible con SQLite y PostgreSQL |
+| Migraciones | Runner propio con SQL embebido + `schema_migrations` | Viaja con el binario, idempotente, sin tooling externo |
 | Templates | `html/template` (stdlib) | Sin dependencias externas |
 | Frontend | HTMX + CSS minimal | Interactividad sin JS framework |
-| Validación | `go-playground/validator` | Estándar en ecosistema Go |
+| Validación | `Validate()` en la capa de dominio | Una sola fuente de invariantes para API, HTML, seed y tests |
 | Logging | `log/slog` (stdlib) | Structured logging nativo desde Go 1.21 |
-| Testing | `testing` + `testify` | Assertions y mocking |
+| Testing | `testing` (stdlib) | Unit, integración real SQLite, httptest y render de templates |
 
 ## Estructura del Proyecto
 
 ```
 estimulos-incentivos/
 ├── cmd/
-│   └── server/
-│       └── main.go                 # Entry point
+│   └── server/                  # Entry point: main.go, config.go, root.go,
+│                                # health.go, server.go (ciclo de vida completo)
 ├── internal/
-│   ├── domain/                     # Entidades puras (sin dependencias externas)
+│   ├── domain/                  # Entidades puras con Validate()
 │   │   ├── empleado.go
 │   │   ├── perfil_map.go
-│   │   ├── incentivo.go            # Tipos: identidad, beneficio, formación, proyecto_corp
-│   │   ├── nudge.go                # Tipos: defaults, social_proof, framing, friccion
-│   │   ├── estimulo.go             # Trigger calibrado con intensidad + canal + timing
-│   │   └── umbral.go               # Umbral absoluto + diferencial + histórico
-│   ├── engine/                     # Lógica de negocio pura
-│   │   ├── calibrador.go           # Cálculo y ajuste de umbrales
-│   │   ├── recomendador.go         # Orquestación de las 3 capas
-│   │   ├── detector_riesgo.go      # Detección de empleados bajo la curva de acción
-│   │   └── analisis.go             # Motor descriptivo (distribuciones, efectividad, ROI)
-│   ├── store/                      # Capa de persistencia
-│   │   └── sqlite/
-│   │       ├── empleados.go
-│   │       ├── incentivos.go
-│   │       ├── nudges.go
-│   │       ├── estimulos.go
-│   │       ├── historial.go        # Registro de intervenciones y respuestas
-│   │       └── migrations/
-│   ├── handler/                    # HTTP handlers
-│   │   ├── empleados.go
-│   │   ├── incentivos.go
-│   │   ├── nudges.go
-│   │   ├── estimulos.go
-│   │   ├── recomendaciones.go
-│   │   └── dashboard.go
-│   └── service/                    # Capa de aplicación (orquesta domain + engine + store)
-│       ├── empleado_service.go
-│       ├── recomendacion_service.go
-│       └── analisis_service.go
+│   │   ├── incentivo.go         # Tipos: identidad, beneficio, formación, proyecto_corp
+│   │   ├── nudge.go             # Tipos: defaults, social_proof, framing, friccion
+│   │   ├── estimulo.go          # Trigger calibrado con intensidad + canal + timing
+│   │   └── umbral.go            # Umbral absoluto + diferencial + histórico
+│   ├── engine/                  # Lógica de negocio pura
+│   │   ├── calibrador.go        # Cálculo y ajuste de umbrales
+│   │   ├── recomendador.go      # Orquestación de las 3 capas
+│   │   ├── detector_riesgo.go   # Detección de empleados bajo la curva de acción
+│   │   ├── elegibilidad.go      # Reglas de elegibilidad de incentivos
+│   │   └── analisis.go          # Motor descriptivo (distribuciones, efectividad, ROI)
+│   ├── service/                 # Capa de aplicación (orquesta domain + engine + store)
+│   │   └── service.go           # Comandos validados, workflows atómicos, Seed
+│   ├── store/
+│   │   └── sqlite/              # Persistencia: modernc.org/sqlite
+│   │       ├── store.go         # WithTx, migraciones embebidas, pool de 1 conexión
+│   │       ├── empleados.go     # Repositorio de empleados (CRUD + Tx)
+│   │       ├── incentivos.go    # Repositorio de incentivos
+│   │       ├── nudges.go        # Repositorio de nudges
+│   │       ├── estimulos.go     # Estímulos, umbrales, historial (transición atómica)
+│   │       └── migrations/      # 000001_initial_schema, 000002_hardening (up/down)
+│   └── handler/                 # HTTP: rutas, auth, CSRF, templates
+│       ├── handler.go           # Registro de rutas HTML + API
+│       ├── auth.go              # Operador único, sesiones firmadas, CSRF por sesión
+│       ├── middleware.go        # RequireAuth(CSRFProtect(...))
+│       └── templates.go         # TemplateSet parseado una vez (cwd-independiente)
 ├── web/
-│   └── templates/                  # Templates Go html/template
-│       ├── base.html
+│   └── templates/               # Templates Go html/template + parciales HTMX
+│       ├── base.html            # Layout con meta csrf-token e inyección HTMX
 │       ├── dashboard.html
-│       ├── empleados/
+│       ├── login.html
+│       ├── empleados/           # list, detail, _form, _row, _import_*
 │       ├── incentivos/
 │       ├── nudges/
 │       └── estimulos/
+├── Dockerfile                   # Multi-stage, CGO-free, alpine runtime
+├── compose.yaml                 # Una instancia, volumen SQLite, healthcheck
+├── .github/workflows/ci.yml     # test/build/vet/gofmt fijados a la raíz
 ├── go.mod
 └── go.sum
 ```
@@ -322,4 +331,4 @@ estimulos-incentivos/
 1. **Origen de datos en MVP**: ¿Los datos de empleados y métricas se ingresan 100% manual por formulario, o hay algún CSV/Excel que se importe? Esto define si necesitamos un importador en el MVP.
 2. **Métricas de desempeño**: ¿Qué métricas concretas vamos a trackear? (ej: cumplimiento de objetivos, asistencia, feedback 360°, productividad). Esto define la estructura del perfil MAP.
 3. **Alcance del dashboard**: ¿El MVP necesita gráficos (distribución MAP, efectividad) o alcanza con tablas y alertas textuales?
-4. **Multi-tenant**: ¿Una instancia = una empresa, o el MVP contempla múltiples organizaciones?
+4. **Multi-tenant**: Resuelto como **no-goal**: una instancia = una organización, un solo operador (ver README y design-production-hardening.md).
