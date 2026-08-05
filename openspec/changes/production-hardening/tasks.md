@@ -21,13 +21,13 @@ Chain strategy: pending
 
 ## Phase 1: Data Integrity
 
-- [ ] 1.1 RED: `internal/domain/*_test.go` — Validate() rejects invalid ranges/enums/cross-field
-- [ ] 1.2 GREEN: add Validate() to Empleado, PerfilMAP, Umbral, Estimulo (`empleado.go`, `perfil_map.go`, `umbral.go`, `estimulo.go`)
-- [ ] 1.3 RED: sqlite tests — WithTx rollback, tx-aware CRUD on real DB
-- [ ] 1.4 GREEN: `Store.WithTx` + `CreateEmpleadoTx`/`CreatePerfilMAPTx`/`CreateUmbralTx`/`TransitionEstimuloTx`
-- [ ] 1.5 RED: service tests — `CreateEmpleadoConPerfil` rollback; ApplyEstimulo repeat/concurrent (one winner)
-- [ ] 1.6 GREEN: fix `CreateEmpleadoConPerfil` (use WithTx); `ApplyEstimulo` conditional UPDATE + RowsAffected + `ApplyResult`; Validate() first
-- [ ] 1.7 Migrations: `000002_hardening.up.sql` (FK/CHECK/UNIQUE/index after backfill) + `.down.sql` (data-preserving)
+- [x] 1.1 RED: `internal/domain/*_test.go` — Validate() rejects invalid ranges/enums/cross-field
+- [x] 1.2 GREEN: add Validate() to Empleado, PerfilMAP, Umbral, Estimulo (`empleado.go`, `perfil_map.go`, `umbral.go`, `estimulo.go`)
+- [x] 1.3 RED: sqlite tests — WithTx rollback, tx-aware CRUD on real DB
+- [x] 1.4 GREEN: `Store.WithTx` + `CreateEmpleadoTx`/`CreatePerfilMAPTx`/`CreateUmbralTx`/`TransitionEstimuloTx`
+- [x] 1.5 RED: service tests — `CreateEmpleadoConPerfil` rollback; ApplyEstimulo repeat/concurrent (one winner)
+- [x] 1.6 GREEN: fix `CreateEmpleadoConPerfil` (use WithTx); `ApplyEstimulo` conditional UPDATE + RowsAffected + `ApplyResult`; Validate() first
+- [x] 1.7 Migrations: `000002_hardening.up.sql` (FK/CHECK/UNIQUE/index after backfill) + `.down.sql` (data-preserving)
 
 ## Phase 2: Operator Security
 
