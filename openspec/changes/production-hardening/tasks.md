@@ -31,10 +31,10 @@ Chain strategy: pending
 
 ## Phase 2: Operator Security
 
-- [ ] 2.1 RED: handler tests — 401 unauthenticated, cookie flags, bad CSRF rejected, no state change
-- [ ] 2.2 GREEN: `internal/handler/auth.go` — env operator creds + session secret, login/logout, Secure/HttpOnly/SameSite=Lax cookie
-- [ ] 2.3 GREEN: `internal/handler/middleware.go` — auth middleware, mutation authorization, session-bound CSRF, safe errors
-- [ ] 2.4 GREEN: wire middleware + CSRF into `handler.go`, `cmd/server/main.go`, template forms
+- [x] 2.1 RED: handler tests — 401 unauthenticated, cookie flags, bad CSRF rejected, no state change
+- [x] 2.2 GREEN: `internal/handler/auth.go` — env operator creds + session secret, login/logout, Secure/HttpOnly/SameSite=Lax cookie
+- [x] 2.3 GREEN: `internal/handler/middleware.go` — auth middleware, mutation authorization, session-bound CSRF, safe errors
+- [x] 2.4 GREEN: wire middleware + CSRF into `handler.go`, `cmd/server/main.go`, template forms
 
 ## Phase 3: Integration Confidence
 
