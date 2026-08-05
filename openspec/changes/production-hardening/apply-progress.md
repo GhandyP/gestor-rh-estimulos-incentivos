@@ -1,32 +1,44 @@
-# Apply Progress: production-hardening — Slices 1-3 (data-integrity + operator-security + integration-confidence)
+# Apply Progress: production-hardening — Slices 1-4 (data-integrity + operator-security + integration-confidence + operable-delivery)
 
-**Branches**: `slice/1-data-integrity` (baseline `4e8b406`) · `slice/2-operator-security` (from slice/1 head `8b2ebbe`) · `slice/3-integration-confidence` (from slice/2 head `05288ff`)
+**Branches**: `slice/1-data-integrity` (baseline `4e8b406`) · `slice/2-operator-security` (from slice/1 head `8b2ebbe`) · `slice/3-integration-confidence` (from slice/2 head `05288ff`) · `slice/4-operable-delivery` (from slice/3 head `8c2347d`)
 **Mode**: Strict TDD (go test ./..., `strict_tdd: true` en openspec/config.yaml)
-**Delivery**: chained slices — PR 1 (data-integrity), PR 2 (operator-security), PR 3 (integration-confidence); per `delivery_strategy=ask-on-risk` resolved by the orchestrator to slice execution. No remote: local commits only.
-**Status**: Phase 1 (tasks 1.1–1.7), Phase 2 (tasks 2.1–2.4) and Phase 3 (tasks 3.1–3.4) COMPLETE. Tree clean, all checks green.
+**Delivery**: chained slices — PR 1 (data-integrity), PR 2 (operator-security), PR 3 (integration-confidence), PR 4 (operable-delivery); per `delivery_strategy=ask-on-risk` resolved by the orchestrator to slice execution. Chain strategy: `stacked-to-main` (slice/4 branch from slice/3 head; no push/PR — local reviewable boundaries only).
+**Status**: Phase 1 (tasks 1.1–1.7), Phase 2 (tasks 2.1–2.4), Phase 3 (tasks 3.1–3.4) and Phase 4 (tasks 4.1–4.3) COMPLETE. Tree clean, all checks green.
 
-## TDD Cycle Evidence
+## Slice 4 (operable-delivery) — TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 4.1 (templates) | `internal/handler/templates_set_test.go` | Template set (parse+execute, real files) | ✅ full suite green (43+ handler tests) | ✅ Written first — compile fails: `TemplateSet`, `ParseTemplates`, `SetTemplates` undefined | ✅ 8/8 tests pass | ✅ every registered page loads; missing asset (`estimulos/_table.html`) fails load; unknown page errors; partial root render (`stats` >42<); cwd-independent via `t.Chdir`; deterministic double-render | ✅ `templateFuncs` moved to templates.go; pageDefs sorted for deterministic iteration; gofmt clean |
+| 4.1 (config) | `cmd/server/config_test.go` | Unit | ✅ prior suite green | ✅ Written first — compile fails: `Config`/`ConfigFromEnv` undefined | ✅ 4/4 tests pass | ✅ defaults (DB_PATH/8080/15s), custom values, 6 invalid PORTs, 4 invalid SHUTDOWN_TIMEOUTs | ✅ envString helper extracted |
+| 4.1 (root) | `cmd/server/root_test.go` | Unit (cwd-independence) | ✅ prior suite green | ✅ Written first — compile fails: `resolveAppRoot` undefined | ✅ 4/4 tests pass | ✅ repo-root found + go.mod/web/templates present; `t.Chdir` arbitrary dir → still found; APP_ROOT override; relative APP_ROOT normalized to absolute | ✅ — |
+| 4.1 (health) | `cmd/server/health_test.go` | Integration (real SQLite + real templates, httptest) | ✅ prior suite green | ✅ Written first — compile fails: `newHealthMux` undefined | ✅ 4/4 tests pass | ✅ healthz 200 "ok"; readyz 200 "ready"; readyz 503 "not ready" with DB closed; readyz 503 with templates nil | ✅ — |
+| 4.1 (lifecycle) | `cmd/server/lifecycle_test.go` | Integration (real server: real SQLite, real templates, real HTTP) | ✅ prior suite green | ✅ Written first — compile fails: `run`, `shutdownServer` undefined | ✅ 6/6 tests pass | ✅ full run: readyz poll 200 → cancel → returns nil ≤ bound → listener closed (dial refused) → log has starting/server listening/request/shutdown complete; startup fails on missing templates (ERROR event, never listens); startup fails on unopenable DB; in-flight request drained within bound (150ms handler, 3s bound, elapsed 100ms–3s, request 200); bound exceeded → forced close + error ≤ 2s | ✅ shutdownServer extracted (Background-based timeout, not the canceled signal ctx — avoids instant-expired deadline); statusRecorder/requestLogger separated |
+| 4.2 | `cmd/server/delivery_test.go` | Structural (delivery artifacts) | ✅ prior suite green | ✅ Written first — files don't exist (`leer Dockerfile: no such file`) | ✅ 3/3 tests pass | ✅ Dockerfile pinned golang:1.26.2-alpine + alpine:3.21, CGO_ENABLED=0, COPY web/, APP_ROOT=/app, HEALTHCHECK, EXPOSE, DB_PATH; compose single instance (1 container_name, 1 image), 8080:8080, estimulos-data:/data volume, healthcheck, no deploy/replicas; .dockerignore excludes .git/openspec/*.db//server | ✅ — |
+| 4.3 | `cmd/server/ci_test.go` | Structural (threat matrix: PR commands) | ✅ prior suite green | ✅ Written first — `.github/workflows/ci.yml` missing (RED: file read fails) | ✅ 3/3 tests pass | ✅ all four commands present (`go test ./...`, `go build ./...`, `go vet ./...`, `gofmt -l .`); pinned to repo root (`working-directory: ${{ github.workspace }}`); triggers push+pull_request, go-version-file; no `git commit`/`git push`/`git config`; no `github.event` composed input | ✅ — |
+
+### Slice 4 — Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command / result | `go test ./internal/handler/ -run 'TestParseTemplates\|TestTemplateSet\|TestHandlerSetTemplates'` — 8/8 ok · `go test ./cmd/server/` — 27 tests ok (config 4, root 4, health 4, lifecycle 6, delivery 3, ci 3, helpers) |
+| Runtime harness command / result | Binary smoke: `go build -o /tmp/opencode/smoke-server ./cmd/server` + run from foreign cwd (`/tmp/opencode/smoke`) with `APP_ROOT=<repo>` → `/healthz` 200, `/readyz` `ready`, `/login` 200 (template set render), SIGTERM → `shutting down, draining active requests` → `shutdown complete` → process exited, port freed. Docker: `docker compose config -q` OK → `docker compose up -d --build` → health `healthy` → `/healthz` 200, `/readyz` `ready` → volume `estimulos-data` contains seeded `estimulos.db` (81920 bytes) → `docker compose down` + `rm -f` clean |
+| Rollback boundary | Revert `fffc0f8`→`1828e9e` (5 commits) or `git revert` per commit: `feat(handler)` (templates set + render wiring), `feat(server)` (lifecycle), `feat(ops)` (Docker/compose), `ci:` (workflow), `style:` (gofmt). TemplateSet refactor reverts without touching store/service/domain logic; Docker/CI files are additive |
+
+## TDD Cycle Evidence (cumulative, slices 1–3 preserved)
 
 | Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
 |------|-----------|-------|------------|-----|-------|-------------|----------|
 | 1.1+1.2 | `internal/domain/validate_test.go` | Unit | N/A (new package tests) | ✅ Written first — compile fails: `Validate undefined` | ✅ 32/32 cases pass | ✅ 7+ cases per entity (valid + each rejection + cross-field) | ✅ gofmt, shared table harness |
 | 1.3+1.4 | `internal/store/sqlite/store_test.go` | Integration (real SQLite, t.TempDir) | ✅ engine+domain baseline pass | ✅ Written first — compile fails: WithTx signature + missing Tx methods | ✅ 7/7 tests pass | ✅ commit, rollback, conditional transition, missing stimulus | ✅ insert logic extracted behind `execer`/`queryer` |
-| 1.5+1.6 | `internal/service/service_test.go` | Integration (real store + SQLite trigger failure injection) | ✅ prior suite green | ✅ Written first — compile fails: `ApplyEstimulo returns 1 value` | ✅ 7/7 tests pass | ✅ 8-way concurrent one-winner; double apply; invalid respuesta | ✅ service.go gofmt'ed (pre-existing drift) |
+| 1.5+1.6 | `internal/service/service_test.go` | Integration (real store + SQLite trigger failure injection) | ✅ prior suite green | ✅ Written first — compile fails: `ApplyEstimulo returns 1 value` | ✅ 7/7 tests pass | ✅ 8-way concurrent one-winner; double apply; invalid respuesta | ✅ service.go gofmt'ed |
 | 1.7 | `internal/store/sqlite/migrations_test.go` | Integration (legacy + fresh real DBs) | ✅ prior suite green | ✅ Embedded RED: legacy insert with missing parent SUCCEEDS pre-migration, rejected post | ✅ 5/5 tests pass | ✅ idempotency, FK, CHECK, orphan backfill, down | ✅ runner extracted: `recordMigration`/`applyPending` |
-| 2.1+2.2 (auth) | `internal/handler/auth_test.go` | Integration (httptest, real SQLite) | ✅ prior suite green (28 tests) | ✅ Written first — compile fails: `Authenticator undefined`, `New(svc, auth)` arity | ✅ 7/7 tests pass | ✅ 2 login-failure cases (user vs password), tampered token, logout lifecycle | ✅ session token nonce extracted (fixes same-second collision) |
+| 2.1+2.2 (auth) | `internal/handler/auth_test.go` | Integration (httptest, real SQLite) | ✅ prior suite green (28 tests) | ✅ Written first — compile fails: `Authenticator undefined`, `New(svc, auth)` arity | ✅ 7/7 tests pass | ✅ 2 login-failure cases (user vs password), tampered token, logout lifecycle | ✅ session token nonce extracted |
 | 2.1+2.3 (CSRF) | `internal/handler/csrf_test.go` | Integration (httptest, real SQLite) | ✅ auth tests green | ✅ Written first — compile fails: `Middleware undefined`; then runtime RED: wrong middleware order returned 403 always | ✅ 5/5 tests pass | ✅ absent/malformed/mismatched/valid-header/form-field; no-state-change via count | ✅ chain order fixed to `RequireAuth(CSRFProtect(next))` |
 | 2.4 | `internal/handler/templates_security_test.go` | Structural (cwd-independent reads) | ✅ full suite green | ✅ Written first — assertions on not-yet-wired templates fail | ✅ 3/3 tests pass | ✅ meta tag + header injection + login + 6 mutation forms | ✅ page data maps share `csrfFor(r)` helper |
-| 3.1 | `internal/store/sqlite/store_test.go` | Integration (real SQLite, t.TempDir) | ✅ full suite green (43 tests) | ✅ Written first — scenario not covered at store level (concurrency only at service layer) | ✅ 2/2 tests pass | ✅ 8-way concurrent one-winner + multi-entity rollback across 3 tables | ✅ gofmt |
-| 3.2 | `internal/handler/routes_test.go` | Integration (httptest, real SQLite) | ✅ full suite green | ✅ Written first — success/error routes + PUT-rejection persistence not covered after slice 2 | ✅ 4/4 tests pass (6 success cases + 4 error cases + malformed body + PUT rejected) | ✅ success list/detail, 400/404/405 safe statuses, malformed body, second mutation verb | ✅ gofmt |
-| 3.3+3.4 | `internal/handler/templates_render_test.go` + `web/templates/empleados/list.html` | Template render (parse+execute, cwd-independent) | ✅ full suite green | ✅ TRUE RED: rendered list had 2 delete actions per row and 6 open/7 close cells | ✅ RED→GREEN: tests fail pre-fix, pass post-fix (byte-identical re-render, 1 delete/row, 6/6 cells, key pages reproducible) | ✅ 3 employees fixture + 4 key pages + login | ✅ gofmt |
-
-## Work Unit Evidence
-
-| Evidence | Value |
-|---|---|
-| Focused test command / result | Slice 3: `go test ./internal/store/sqlite/ -run 'TransitionEstimuloTxConcurrentOneWinner\|MultiEntityWorkflowRollbackLeavesNoPartialState'` — 2/2 ok · `go test ./internal/handler/` — all ok (auth 7, CSRF 5, templates-security 3, routes 4, render 5) · slice 1: domain 32, store 12, service 7, migrations 5; slice 2: handler 15 |
-| Runtime harness | `go test ./... -count=1 -timeout 120s` ok · `go build ./...` ok · `go vet ./...` ok · live server smoke test (slice 2) — see slice-2 evidence below |
-| Rollback boundary | Slice 3: revert `6980051`→`8afb535` (3 commits) or `git revert 8afb535` for template fix; store/handler tests revert without touching slices 4–5; slice 1-2 rollback as previously recorded |
+| 3.1 | `internal/store/sqlite/store_test.go` | Integration (real SQLite, t.TempDir) | ✅ full suite green (43 tests) | ✅ Written first — scenario not covered at store level | ✅ 2/2 tests pass | ✅ 8-way concurrent one-winner + multi-entity rollback across 3 tables | ✅ gofmt |
+| 3.2 | `internal/handler/routes_test.go` | Integration (httptest, real SQLite) | ✅ full suite green | ✅ Written first — success/error routes + PUT-rejection persistence not covered after slice 2 | ✅ 4/4 tests pass | ✅ success list/detail, 400/404/405 safe statuses, malformed body, second mutation verb | ✅ gofmt |
+| 3.3+3.4 | `internal/handler/templates_render_test.go` + `web/templates/empleados/list.html` | Template render (parse+execute, cwd-independent) | ✅ full suite green | ✅ TRUE RED: rendered list had 2 delete actions per row and 6 open/7 close cells | ✅ RED→GREEN: tests fail pre-fix, pass post-fix | ✅ 3 employees fixture + 4 key pages + login | ✅ gofmt |
 
 ## Completed Tasks (cumulative)
 
@@ -45,72 +57,56 @@
 - [x] 3.2 RED httptest success/error routes + persistence unchanged on rejected PUT/malformed body
 - [x] 3.3 RED deterministic template render tests (list.html + key pages; RED caught duplicate delete + orphan `</td>`)
 - [x] 3.4 GREEN `list.html` fixed — exactly one delete action per row, 6/6 balanced cells
+- [x] 4.1 GREEN `cmd/server/{main,config,root,health,server}.go` + `internal/handler/templates.go` — startup validation (fail before traffic), slog startup/request/error events, /healthz + /readyz, bounded graceful shutdown (drain + force-close), templates parsed once from explicit root (cwd-independent)
+- [x] 4.2 GREEN `Dockerfile` + `compose.yaml` + `.dockerignore` — reproducible single-instance demo, SQLite volume, healthcheck (verified live via docker compose)
+- [x] 4.3 GREEN `.github/workflows/ci.yml` — repo-root-pinned workflow running go test/build/vet + gofmt gate, fail on non-zero, no commit/push, no composed user input
 
 ## Files Changed
 
-### Slice 1 (data-integrity)
+### Slice 4 (operable-delivery)
 
 | File | Action |
 |------|--------|
-| `internal/domain/{empleado,estimulo,perfil_map,umbral}.go` | Modified — added `Validate() error` |
-| `internal/domain/validate_test.go` | Created — table-driven validator tests |
-| `internal/store/sqlite/store.go` | Modified — `WithTx` per design contract, migration runner (`schema_migrations`), FK pragma per connection |
-| `internal/store/sqlite/empleados.go` | Modified — `CreateEmpleadoTx`, `CreatePerfilMAPTx`, fixed `CreateEmpleadoConPerfil` to write through tx |
-| `internal/store/sqlite/estimulos.go` | Modified — `CreateUmbralTx`, `TransitionEstimuloTx`, tx variants; removed old `ApplyEstimulo` |
-| `internal/store/sqlite/store_test.go` | Created — 7 tx integration tests |
-| `internal/store/sqlite/migrations/000002_hardening.{up,down}.sql` | Created — backfill + FK/CHECK/UNIQUE/index migration pair |
-| `internal/store/sqlite/migrations_test.go` | Created — 5 migration tests |
-| `internal/service/service.go` | Modified — atomic `CreateEmpleado`, `ApplyResult`, idempotent `ApplyEstimulo`, Validate-first |
-| `internal/service/service_test.go` | Created — 7 service tests |
-| `internal/handler/handler.go` | Modified — adapted `ApplyEstimuloAPI` to `ApplyResult` (conflict → `status: conflict`) |
+| `internal/handler/templates.go` | Created — `TemplateSet` + `ParseTemplates(root)` parse-once (all page/partial sets, deterministic sorted iteration, any missing file = startup error); `pageDefs` single source of truth; partials named by basename so root `Execute` works (fixes pre-existing `incomplete or empty template` 500s) |
+| `internal/handler/handler.go` | Modified — `templates *TemplateSet` field + `SetTemplates` + `execute`/`renderHTML` helpers; all 24 render sites switched from per-request `ParseFiles` to the pre-parsed set (buffer-then-write, generic 500 on error) |
+| `internal/handler/templates_set_test.go` | Created — 8 tests (load all pages, missing asset fails, no templates dir fails, deterministic render, partial root render, unknown page errors, cwd-independent, SetTemplates wiring) |
+| `cmd/server/config.go` | Created — `Config` + `ConfigFromEnv` (PORT 1–65535, SHUTDOWN_TIMEOUT positive duration, DB_PATH/APP_ROOT defaults) |
+| `cmd/server/root.go` | Created — `resolveAppRoot`: APP_ROOT override (containers) else walk-up from source path to go.mod (cwd-independent) |
+| `cmd/server/health.go` | Created — `newHealthMux`: public `/healthz` (liveness) + `/readyz` (readiness: templates loaded + DB ping, 503 otherwise) |
+| `cmd/server/server.go` | Created — `run(ctx, cfg, logger)`: full wiring (store→migrate→ping→seed→auth→templates→mux→health→slog request logging); `shutdownServer` bounded graceful shutdown (drain, force-close on bound exceeded); `statusRecorder`/`requestLogger` structured slog events |
+| `cmd/server/main.go` | Rewritten — slog TextHandler, ConfigFromEnv validation, `signal.NotifyContext` (SIGINT/SIGTERM), `run()` delegate, structured error exit |
+| `cmd/server/{config,root,health,lifecycle,testutil}_test.go` | Created — 27 tests (see evidence) |
+| `Dockerfile` | Created — multi-stage, pinned golang:1.26.2-alpine build (CGO_ENABLED=0, static binary) + alpine:3.21 runtime with ca-certificates/tzdata, `COPY web/`, APP_ROOT=/app, DB_PATH=/data, VOLUME /data, HEALTHCHECK /readyz |
+| `compose.yaml` | Created — single `app` service, 8080:8080, SQLite volume `estimulos-data:/data`, env overrides with dev defaults, healthcheck, restart unless-stopped, no deploy/replicas |
+| `.dockerignore` | Created — excludes .git/openspec/*.db//server from build context |
+| `.github/workflows/ci.yml` | Created — `ci` on push+pull_request, checkout+setup-go (go-version-file), steps test/build/vet + gofmt gate (fail on non-empty `gofmt -l .`), working-directory pinned to `${{ github.workspace }}`, contents:read, no commit/push |
+| `cmd/server/{delivery,ci}_test.go` | Created — 6 structural artifact tests |
+| `internal/domain/{incentivo,nudge}.go`, `internal/engine/{analisis,calibrador}.go` | Modified — gofmt-only normalization of PRE-EXISTING drift (32/32 identical lines realigned; required so the new CI gofmt gate passes; see Deviations) |
 
-### Slice 2 (operator-security)
+### Slices 1–3 (preserved — see previous revisions)
 
-| File | Action |
-|------|--------|
-| `internal/handler/auth.go` | Created — `AuthConfig`/`AuthConfigFromEnv` (OPERATOR_USER/PASSWORD, SESSION_SECRET, COOKIE_SECURE), `Authenticator` (constant-time creds, signed stateless session tokens with random nonce, session-bound CSRF derivation, Secure/HttpOnly/SameSite=Lax cookie) |
-| `internal/handler/middleware.go` | Created — `RequireAuth` (401 JSON / 303 HTML), `CSRFProtect` (mutations only, X-CSRF-Token header or `_csrf` field), `Handler.Middleware` chain, safe-error JSON helpers |
-| `internal/handler/handler.go` | Modified — `New(svc, auth)` signature, login/logout/login-page handlers, `csrfFor(r)` helper, `CSRFToken` in all page/form data (detail pages wrapped under `Detail`) |
-| `internal/handler/auth_test.go` | Created — 7 httptest auth tests |
-| `internal/handler/csrf_test.go` | Created — 5 httptest CSRF tests |
-| `internal/handler/templates_security_test.go` | Created — 3 structural template-wiring tests |
-| `cmd/server/main.go` | Modified — auth from env, startup warning for dev defaults (no values logged), `h.Middleware(mux)` as handler |
-| `web/templates/login.html` | Created — standalone operator login page |
-| `web/templates/base.html` | Modified — csrf meta tag, htmx `configRequest` X-CSRF-Token injection, logout form |
-| `web/templates/empleados/{_form,_import_form,_perfil_form,detail}.html` | Modified — hidden `_csrf` inputs; detail wrapped under `Detail` |
-| `web/templates/{incentivos/_form,incentivos/detail,nudges/_form,estimulos/_apply_form}.html` | Modified — hidden `_csrf` inputs; apply form under `Estimulo` |
-| `.gitignore` | Fixed — `server` → `/server` (was ignoring all of `cmd/server/`) |
-
-### Slice 3 (integration-confidence)
-
-| File | Action |
-|------|--------|
-| `internal/store/sqlite/store_test.go` | Modified — `TestTransitionEstimuloTxConcurrentOneWinner` (8 goroutines, exactly 1 winner, 1 historial, estado aplicado) + `TestMultiEntityWorkflowRollbackLeavesNoPartialState` (failure after 3 writes → 0 rows in empleados/perfiles_map/umbrales) |
-| `internal/handler/routes_test.go` | Created — `TestAuthenticatedSuccessRoutes` (6 JSON read endpoints), `TestErrorRoutesReturnSafeStatuses` (400/404/405, no internal details), `TestMalformedJSONBodyRejectedWithoutStateChange`, `TestRejectedUpdateMutationDoesNotChangeState` (PUT sin CSRF → 403, empleado intacto) |
-| `internal/handler/templates_render_test.go` | Created — `TestEmpleadosListParseAndDeterministicRender`, `TestEmpleadosListExactlyOneDeleteActionPerRow`, `TestEmpleadosListBalancedCellsPerRow`, `TestKeyPagesParseAndDeterministicRender` (dashboard/incentivos/estimulos/login), `TestNudgesListParses` (parse-only, defect documentado) |
-| `web/templates/empleados/list.html` | Fixed — removed duplicated delete `<button>` y `</td>` huérfano; una sola acción de borrado por fila, celdas 6/6 balanceadas |
+Slice 1: domain validators (`internal/domain/*.go` + `validate_test.go`), `store.go`/`empleados.go`/`estimulos.go` (WithTx + tx CRUD), migrations `000002_hardening.{up,down}.sql`, `service.go` (atomic/ApplyResult), handler apply adaptation. Slice 2: `auth.go`, `middleware.go`, `handler.go` wiring, `login.html`, base/mutation template CSRF, `.gitignore` fix. Slice 3: store concurrent/rollback tests, `routes_test.go`, `templates_render_test.go`, `list.html` fix.
 
 ## Deviations from Design
 
-1. **`.gitignore` defect fixed (slice 2)**: pattern `server` ignored the whole `cmd/server/` directory — `cmd/server/main.go` had never been tracked. Anchored to `/server` so the built binary stays ignored but `cmd/server` is committed. Pre-existing repo defect, discovered because task 2.4 mandates main.go wiring.
-2. **Stateless sessions**: session tokens are signed, stateless cookies (expiry + nonce + HMAC). Logout clears the client cookie but does NOT revoke already-issued tokens (revocation would need server-side state); documented as accepted limitation for a single-operator local tool. The nonce was added after the CSRF mismatch test exposed same-second token collisions.
-3. **Middleware order**: chain is `RequireAuth(CSRFProtect(next))` — CSRFProtect needs the authenticated session in context; the reverse order (initially implemented) made every mutation return 403. Caught by the httptest suite.
-4. **CSRF via header is the primary mechanism**: HTMX forms use `json-enc`, which `r.FormValue("_csrf")` cannot parse; the global `htmx:configRequest` header injection (meta tag) covers every HTMX mutation including `hx-delete`/`hx-put` buttons; hidden `_csrf` inputs are added to dedicated forms as the non-JS fallback.
-5. **Detail pages wrapped under `Detail`** (and apply form under `Estimulo`, perfil form under `Perfil`) so `base.html` can render `{{.CSRFToken}}` from map data.
-6. Slice 1 deviations (CreateEmpleado atomicity, extra tx variants, ON DELETE CASCADE, WithTx signature) remain as previously recorded.
-7. **Slice 3 — unknown-route GET**: the mux registers `GET /` (dashboard), so an unknown GET path falls through to the dashboard and returns 500 when templates are cwd-relative (slice-4 concern). The httptest error-route table covers the real boundary instead: 400 invalid ID, 404 missing resource, 405 method-not-allowed on unmapped paths (POST + valid CSRF reaches the mux). No handler code was changed in slice 3.
-8. **Slice 3 — pre-existing nudges template defect (NOT fixed, out of scope)**: `web/templates/nudges/_card.html` lacks `{{define "nudge-card"}}`, but `nudges/list.html` invokes `{{template "nudge-card" .}}`. html/template resolves `{{template}}` references at execution even in un-taken branches, so `/nudges` renders an empty 200 (handler ignores the ExecuteTemplate error) and `ToggleNudgeAPI`'s `ExecuteTemplate(w, "nudge-card", ...)` errors. Covered as parse-only (`TestNudgesListParses`); the fix (adding the define) belongs to a later slice or a dedicated correction.
+1. **Slice 4 — gofmt normalization of pre-existing drift (4 files)**: `internal/engine/{analisis,calibrador}.go` and `internal/domain/{incentivo,nudge}.go` had PRE-EXISTING formatting drift (documented in slices 1–3 as out of scope). The new CI deliverable (task 4.3) runs a gofmt gate that fails on non-empty `gofmt -l .` output, and spec scenario "Clean checkout passes checks" requires the four commands to reproduce cleanly. gofmt -w is behavior-neutral (verified: 32 insertions / 32 deletions of identical lines, only alignment changed; full suite green before and after). Normalized as a REQUIRED enabler of this slice's own CI gate; recorded here so reviewers can distinguish it from new drift.
+2. **Slice 4 — all HTMX partial endpoints fixed from 500 to working render**: the previous per-request pattern `template.New("").ParseFiles(file)` + `Execute` on the empty root produced the runtime error `template: "" is an incomplete or empty template` (verified empirically) — every partial endpoint (stats/riesgos/distribucion/efectividad/recomendacion/forms/rows/table) returned 500. The TemplateSet names partial roots by basename (top-level `ParseFiles` semantics), making root `Execute` valid. Behavioral fix, not a regression; covered by `TestTemplateSetExecutePartialRendersRoot`.
+3. **Slice 4 — page render errors now generic 500 (safe error mapping)**: previously parse errors leaked template paths (`Error al cargar templates: <path>`); `renderHTML` buffers then writes a generic `error interno` 500. Parse errors now happen at startup (fail-fast), not per-request.
+4. **Slice 4 — `ToggleNudgeAPI` now falls back to JSON on execute error** instead of an empty 200, because the pre-existing defect (`nudges/_card.html` lacks `{{define "nudge-card"}}`) now surfaces as an execute error from the pre-parsed set. The underlying defect remains out of scope (documented since slice 3; fix belongs to a dedicated correction).
+5. **Slice 4 — shutdown timeout uses context.Background() as parent**: the signal context is already canceled when shutdown starts; using it as parent of `context.WithTimeout` would produce an instantly-expired deadline and skip draining. `shutdownServer` builds its own bounded context.
+6. **Slice 4 — `cmd/server` health endpoints bypass the auth/CSRF middleware chain** via a top-level mux (`/healthz`, `/readyz` public; everything else behind `RequireAuth(CSRFProtect(...))` + request logging). This is required for container healthchecks and orchestrator probes.
+7. Deviations 1–8 from slices 1–3 remain as previously recorded (.gitignore defect, stateless sessions, middleware order, CSRF header-primary, Detail wrapping, slice-1 items, unknown-route GET, nudges template defect).
 
 ## Remaining Tasks (other slices, untouched)
 
-- [ ] Phase 4 (operable-delivery), Phase 5 (portfolio-documentation)
+- [ ] Phase 5 (portfolio-documentation): 5.1 `README.md`, 5.2 `doc/*design*.md`
 
 ## Risks
 
-- **Stateless logout** (slice 2): a stolen session cookie remains valid until TTL (24h default) even after logout. Accepted for single-operator local scope; documented in code.
-- **`COOKIE_SECURE=true` default**: over plain-HTTP deployments (e.g., non-localhost) browsers will not store the session cookie; must set `COOKIE_SECURE=false` for such demos or serve TLS (health/readiness and Docker are slice 4).
-- **Login is exempt from CSRF** and **logout is exempt from auth+CSRF** (allowlisted) — login CSRF is a recognized low-risk pattern; logout CSRF impact is nil.
-- **Pre-existing gofmt drift** in `internal/engine/*`, `internal/domain/incentivo.go`, `internal/domain/nudge.go` — untouched (out of scope per slice instructions).
-- **Pre-existing**: `nudges/detail.html` renders `{{with .}}` against a map root (`Nudge` key), so `.Nombre`/`.Descripcion` fields render empty — pre-existing bug observed while wrapping data; out of slice-2 scope (noted for a later phase). **Slice 3 adds**: `nudges/_card.html` missing `{{define "nudge-card"}}` breaks `/nudges` render and `ToggleNudgeAPI` — needs a later correction.
-- **Templates still cwd-relative** (`web/templates/...`): slice 4 makes startup cwd-independent (embed/root). Structural and render tests resolve the repo root via `runtime.Caller` so they pass regardless of cwd.
-- **Delete semantics / migration data checks** from slice 1 remain as previously recorded.
+- **Stateless logout** (slice 2): stolen cookie valid until TTL (24h). Accepted for single-operator local scope.
+- **`COOKIE_SECURE=true` default**: compose sets `COOKIE_SECURE=false` for plain-HTTP demo; production over TLS should keep true.
+- **Login/logout exempt from CSRF+auth (allowlisted)** — accepted low-risk.
+- **Nudges template defects** (`nudges/_card.html` missing `nudge-card` define; `nudges/detail.html` map root) — pre-existing, documented; `ToggleNudgeAPI` returns JSON fallback; `/nudges` page render returns 500 via `renderHTML`. Fix belongs to a dedicated correction (NOT slice 4 scope).
+- **`gofmt -l .` CI gate**: now clean (drift normalized); any future unformatted commit fails CI by design.
+- **Docker image tags pinned to golang:1.26.2-alpine / alpine:3.21**: verified reachable and built successfully in this session; tag updates are intentional, reviewable changes.
+- **Delete semantics / migration data checks** from slice 1 as previously recorded.

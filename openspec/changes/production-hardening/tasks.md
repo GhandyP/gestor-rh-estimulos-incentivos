@@ -6,7 +6,7 @@ Estimated changed lines: ~2,200–2,600 (code + tests + docs + CI); suggested sp
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -45,9 +45,9 @@ Chain strategy: pending
 
 ## Phase 4: Operable Delivery
 
-- [ ] 4.1 `cmd/server/main.go` — startup validation (fail before traffic), slog, /healthz + /readyz, bounded shutdown, cwd-independent templates
-- [ ] 4.2 `Dockerfile` + `compose.yaml` — single-instance demo, SQLite volume, healthcheck
-- [ ] 4.3 `.github/workflows/ci.yml` — go test/build/vet + `gofmt -l .`, pinned to repo root, fail on non-zero (threat matrix: PR commands)
+- [x] 4.1 `cmd/server/main.go` — startup validation (fail before traffic), slog, /healthz + /readyz, bounded shutdown, cwd-independent templates
+- [x] 4.2 `Dockerfile` + `compose.yaml` — single-instance demo, SQLite volume, healthcheck
+- [x] 4.3 `.github/workflows/ci.yml` — go test/build/vet + `gofmt -l .`, pinned to repo root, fail on non-zero (threat matrix: PR commands)
 
 ## Phase 5: Portfolio Documentation
 
