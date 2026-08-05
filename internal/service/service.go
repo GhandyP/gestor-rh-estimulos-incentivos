@@ -22,6 +22,14 @@ func New(store *sqlite.Store) *Service {
 	return &Service{store: store}
 }
 
+// ApplyResult describe el resultado de aplicar un estímulo.
+// Applied=true indica que la transición se realizó; Conflict=true indica
+// que el estímulo ya no estaba pendiente y no hubo efectos secundarios.
+type ApplyResult struct {
+	Applied  bool `json:"applied"`
+	Conflict bool `json:"conflict"`
+}
+
 // Empleados
 
 func (s *Service) CreateEmpleado(ctx context.Context, nombre, email, cargo, departamento string) (*domain.Empleado, error) {
@@ -32,29 +40,40 @@ func (s *Service) CreateEmpleado(ctx context.Context, nombre, email, cargo, depa
 		Departamento: domain.Departamento(departamento),
 		Activo:       true,
 	}
-
-	if err := s.store.CreateEmpleado(ctx, e); err != nil {
-		return nil, err
+	if err := e.Validate(); err != nil {
+		return nil, fmt.Errorf("validar empleado: %w", err)
 	}
 
-	// Crear perfil MAP y umbral por defecto
+	// Empleado, perfil MAP y umbral se persisten atómicamente.
 	perfil := &domain.PerfilMAP{
-		EmpleadoID:    e.ID,
 		Motivacion:    0.50,
 		Habilidad:     0.50,
 		Prompt:        0.60,
 		Sensibilidad:  domain.SensibilidadDesarrollo,
 		Confiabilidad: 0.30,
 	}
-	if err := s.store.CreatePerfilMAP(ctx, perfil); err != nil {
+	umbral := engine.UmbralInicial(0)
+
+	err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.store.CreateEmpleadoTx(ctx, tx, e); err != nil {
+			return err
+		}
+		perfil.EmpleadoID = e.ID
+		if err := perfil.Validate(); err != nil {
+			return fmt.Errorf("validar perfil: %w", err)
+		}
+		if err := s.store.CreatePerfilMAPTx(ctx, tx, perfil); err != nil {
+			return err
+		}
+		umbral.EmpleadoID = e.ID
+		if err := umbral.Validate(); err != nil {
+			return fmt.Errorf("validar umbral: %w", err)
+		}
+		return s.store.CreateUmbralTx(ctx, tx, &umbral)
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	umbral := engine.UmbralInicial(e.ID)
-	if err := s.store.CreateUmbral(ctx, &umbral); err != nil {
-		return nil, err
-	}
-
 	return e, nil
 }
 
@@ -94,6 +113,9 @@ func (s *Service) UpdatePerfilMAP(ctx context.Context, empleadoID int64, motivac
 	p.Prompt = prompt
 	p.Sensibilidad = domain.Sensibilidad(sensibilidad)
 	p.Confiabilidad = confiabilidad
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("validar perfil: %w", err)
+	}
 	return s.store.UpdatePerfilMAP(ctx, p)
 }
 
@@ -171,8 +193,11 @@ func (s *Service) Recomendar(ctx context.Context, empleadoID int64) (*engine.Rec
 
 	result := engine.Recomendar(*e, *p, incentivos, nudges, *u)
 
-	// Si hay estímulo recomendado, persistirlo
+	// Si hay estímulo recomendado, validarlo y persistirlo
 	if result.EstimuloRecomendado != nil {
+		if err := result.EstimuloRecomendado.Validate(); err != nil {
+			return nil, fmt.Errorf("validar estimulo recomendado: %w", err)
+		}
 		if err := s.store.CreateEstimulo(ctx, result.EstimuloRecomendado); err != nil {
 			return nil, fmt.Errorf("guardar estimulo: %w", err)
 		}
@@ -215,42 +240,71 @@ func (s *Service) ListEstimulosPendientes(ctx context.Context) ([]domain.Estimul
 	return s.store.ListEstimulosPendientes(ctx)
 }
 
-func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta float64) error {
-	if err := s.store.ApplyEstimulo(ctx, estimuloID); err != nil {
-		return fmt.Errorf("apply estimulo: %w", err)
+// ApplyEstimulo aplica un estímulo pendiente de forma idempotente y atómica:
+// transición de estado, registro de historial y recalibración del umbral
+// ocurren en una sola transacción. Si el estímulo ya no está pendiente,
+// retorna Conflict=true sin ningún efecto secundario.
+func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta float64) (ApplyResult, error) {
+	if respuesta < 0 || respuesta > 1 {
+		return ApplyResult{}, fmt.Errorf("respuesta debe estar entre 0 y 1")
 	}
 
 	estimulo, err := s.store.GetEstimulo(ctx, estimuloID)
 	if err != nil || estimulo == nil {
-		return fmt.Errorf("get estimulo %d: %w", estimuloID, err)
+		if err == nil {
+			err = fmt.Errorf("no encontrado")
+		}
+		return ApplyResult{}, fmt.Errorf("get estimulo %d: %w", estimuloID, err)
 	}
 
-	umbral, err := s.store.GetUmbral(ctx, estimulo.EmpleadoID)
-	if err != nil || umbral == nil {
-		return fmt.Errorf("get umbral for empleado %d: %w", estimulo.EmpleadoID, err)
-	}
+	result := ApplyResult{}
+	err = s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		applied, err := s.store.TransitionEstimuloTx(ctx, tx, estimuloID, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		if !applied {
+			result = ApplyResult{Conflict: true}
+			return nil
+		}
 
-	if err := s.store.AddHistorial(ctx, umbral.ID, domain.PuntoHistorial{
-		Fecha:        time.Now(),
-		Intensidad:   estimulo.Intensidad,
-		RespuestaMAP: respuesta,
-		Tipo:         estimulo.Tipo,
-	}); err != nil {
-		return fmt.Errorf("add historial: %w", err)
-	}
+		umbral, err := s.store.GetUmbralTx(ctx, tx, estimulo.EmpleadoID)
+		if err != nil || umbral == nil {
+			if err == nil {
+				err = fmt.Errorf("no encontrado")
+			}
+			return fmt.Errorf("get umbral para empleado %d: %w", estimulo.EmpleadoID, err)
+		}
 
-	historial, err := s.store.GetHistorial(ctx, umbral.ID)
+		if err := s.store.AddHistorialTx(ctx, tx, umbral.ID, domain.PuntoHistorial{
+			Fecha:        time.Now(),
+			Intensidad:   estimulo.Intensidad,
+			RespuestaMAP: respuesta,
+			Tipo:         estimulo.Tipo,
+		}); err != nil {
+			return fmt.Errorf("add historial: %w", err)
+		}
+
+		historial, err := s.store.GetHistorialTx(ctx, tx, umbral.ID)
+		if err != nil {
+			return fmt.Errorf("get historial: %w", err)
+		}
+
+		calibrado := engine.CalibrarUmbral(*umbral, historial)
+		if err := calibrado.Validate(); err != nil {
+			return fmt.Errorf("validar umbral recalibrado: %w", err)
+		}
+		if err := s.store.UpdateUmbralTx(ctx, tx, &calibrado); err != nil {
+			return fmt.Errorf("update umbral: %w", err)
+		}
+
+		result = ApplyResult{Applied: true}
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("get historial: %w", err)
+		return ApplyResult{}, err
 	}
-
-	calibrado := engine.CalibrarUmbral(*umbral, historial)
-
-	if err := s.store.UpdateUmbral(ctx, &calibrado); err != nil {
-		return fmt.Errorf("update umbral: %w", err)
-	}
-
-	return nil
+	return result, nil
 }
 
 // EmpleadoDetail agrupa toda la información relevante de un empleado.
@@ -309,6 +363,9 @@ func (s *Service) GetEmpleadoDetail(ctx context.Context, id int64) (*EmpleadoDet
 
 // UpdateEmpleado actualiza los datos de un empleado.
 func (s *Service) UpdateEmpleado(ctx context.Context, e *domain.Empleado) error {
+	if err := e.Validate(); err != nil {
+		return fmt.Errorf("validar empleado: %w", err)
+	}
 	return s.store.UpdateEmpleado(ctx, e)
 }
 
@@ -509,9 +566,9 @@ func (s *Service) ToggleNudge(ctx context.Context, id int64) (*domain.Nudge, err
 
 // IncentivoDetailData agrupa un incentivo con sus elegibilidades y empleados elegibles.
 type IncentivoDetailData struct {
-	Incentivo      *domain.Incentivo      `json:"incentivo"`
-	Elegibilidades []domain.Elegibilidad  `json:"elegibilidades"`
-	Elegibles      []domain.Empleado      `json:"elegibles"`
+	Incentivo      *domain.Incentivo     `json:"incentivo"`
+	Elegibilidades []domain.Elegibilidad `json:"elegibilidades"`
+	Elegibles      []domain.Empleado     `json:"elegibles"`
 }
 
 // GetIncentivoDetail obtiene el detalle completo de un incentivo.

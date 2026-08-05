@@ -128,15 +128,6 @@ func (s *Store) TransitionEstimuloTx(ctx context.Context, tx *sql.Tx, id int64, 
 	return n > 0, nil
 }
 
-// ApplyEstimulo es un envoltorio de transacción para TransitionEstimuloTx,
-// preservado mientras el service migra al flujo transaccional completo.
-func (s *Store) ApplyEstimulo(ctx context.Context, id int64) error {
-	return s.WithTx(ctx, func(tx *sql.Tx) error {
-		_, err := s.TransitionEstimuloTx(ctx, tx, id, time.Now().UTC())
-		return err
-	})
-}
-
 // Umbrales
 
 func (s *Store) CreateUmbral(ctx context.Context, u *domain.Umbral) error {

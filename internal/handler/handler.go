@@ -916,8 +916,14 @@ func (h *Handler) ApplyEstimuloAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Svc.ApplyEstimulo(r.Context(), id, input.Respuesta); err != nil {
+	result, err := h.Svc.ApplyEstimulo(r.Context(), id, input.Respuesta)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if result.Conflict {
+		w.Header().Set("X-Toast", "El estímulo ya fue aplicado")
+		writeJSON(w, map[string]string{"status": "conflict", "message": "El estímulo ya fue aplicado"})
 		return
 	}
 	w.Header().Set("X-Toast", "Estímulo aplicado y umbral recalibrado")
