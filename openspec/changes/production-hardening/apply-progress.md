@@ -17,6 +17,10 @@
 | 4.2 | `cmd/server/delivery_test.go` | Structural (delivery artifacts) | ✅ prior suite green | ✅ Written first — files don't exist (`leer Dockerfile: no such file`) | ✅ 3/3 tests pass | ✅ Dockerfile pinned golang:1.26.2-alpine + alpine:3.21, CGO_ENABLED=0, COPY web/, APP_ROOT=/app, HEALTHCHECK, EXPOSE, DB_PATH; compose single instance (1 container_name, 1 image), 8080:8080, estimulos-data:/data volume, healthcheck, no deploy/replicas; .dockerignore excludes .git/openspec/*.db//server | ✅ — |
 | 4.3 | `cmd/server/ci_test.go` | Structural (threat matrix: PR commands) | ✅ prior suite green | ✅ Written first — `.github/workflows/ci.yml` missing (RED: file read fails) | ✅ 3/3 tests pass | ✅ all four commands present (`go test ./...`, `go build ./...`, `go vet ./...`, `gofmt -l .`); pinned to repo root (`working-directory: ${{ github.workspace }}`); triggers push+pull_request, go-version-file; no `git commit`/`git push`/`git config`; no `github.event` composed input | ✅ — |
 
+### Slice 4 — Test-Count Reconciliation
+
+Stable count: `31 new top-level test functions (23 cmd/server + 8 template-set) plus table-driven subtests`. The TDD table above retains the 32 Phase 4 acceptance cases as scenario evidence. The prior executor summary's `49 new tests` figure is not used as evidence because it is unsupported by the durable acceptance table and repository top-level function count.
+
 ### Slice 4 — Work Unit Evidence
 
 | Evidence | Value |
