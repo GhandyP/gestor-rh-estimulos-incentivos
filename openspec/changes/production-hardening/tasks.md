@@ -38,10 +38,10 @@ Chain strategy: pending
 
 ## Phase 3: Integration Confidence
 
-- [ ] 3.1 RED: SQLite tests — concurrent apply one-winner; mid-tx failure no partial state
-- [ ] 3.2 RED: httptest suite — auth/CSRF/success/error routes; persistence unchanged on rejected requests
-- [ ] 3.3 RED: template test — `list.html` renders deterministically, parseable, exactly one delete action per row
-- [ ] 3.4 GREEN: remove duplicate delete markup in `web/templates/empleados/list.html`
+- [x] 3.1 RED: SQLite tests — concurrent apply one-winner; mid-tx failure no partial state
+- [x] 3.2 RED: httptest suite — auth/CSRF/success/error routes; persistence unchanged on rejected requests
+- [x] 3.3 RED: template test — `list.html` renders deterministically, parseable, exactly one delete action per row
+- [x] 3.4 GREEN: remove duplicate delete markup in `web/templates/empleados/list.html`
 
 ## Phase 4: Operable Delivery
 
