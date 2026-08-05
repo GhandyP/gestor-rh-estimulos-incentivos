@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -131,5 +130,3 @@ func freeAddr(t *testing.T) string {
 	_ = ln.Close()
 	return addr
 }
-
-var _ = fmt.Sprintf // mantener fmt import estable en futuras ediciones
