@@ -29,6 +29,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Module consistency
+        run: go mod tidy -diff
+
+      - name: Checksum verification
+        run: go mod verify
+
       - name: Test
         run: go test ./... -count=1 -timeout 120s
 
@@ -46,3 +52,6 @@ jobs:
             echo "$unformatted"
             exit 1
           fi
+
+      - name: Compose smoke
+        run: ./scripts/compose-smoke.sh
