@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"estimulos-incentivos/internal/store"
 	_ "modernc.org/sqlite"
 )
 
@@ -17,6 +18,8 @@ var migrationsFS embed.FS
 type Store struct {
 	db *sql.DB
 }
+
+var _ store.Repository = (*Store)(nil)
 
 func New(dsn string) (*Store, error) {
 	// Activa foreign_keys en CADA conexión del pool; de otro modo se
@@ -150,14 +153,14 @@ func (s *Store) applyPending(ctx context.Context, version string) error {
 	return s.recordMigration(ctx, version)
 }
 
-func (s *Store) WithTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (s *Store) WithTx(ctx context.Context, fn func(store.Transaction) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
-	if err := fn(tx); err != nil {
+	if err := fn(&transaction{tx: tx}); err != nil {
 		return err
 	}
 	return tx.Commit()

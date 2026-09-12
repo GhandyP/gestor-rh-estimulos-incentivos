@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -257,5 +260,35 @@ func TestApplyEstimuloMissingStimulusFails(t *testing.T) {
 
 	if _, err := svc.ApplyEstimulo(ctx, 999, 0.7); err == nil {
 		t.Fatal("ApplyEstimulo(missing id) = nil, want error")
+	}
+}
+
+func TestServiceProductionSourceStaysAbovePersistenceBoundary(t *testing.T) {
+	_, testFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller() failed")
+	}
+
+	source, err := os.ReadFile(filepath.Join(filepath.Dir(testFile), "service.go"))
+	if err != nil {
+		t.Fatalf("read service.go: %v", err)
+	}
+
+	for _, forbidden := range []string{
+		"database/sql",
+		"internal/store/sqlite",
+		"DB()",
+		"*sql.Tx",
+		"ExecContext",
+		"QueryContext",
+		"QueryRowContext",
+		"SELECT ",
+		"INSERT ",
+		"UPDATE ",
+		"DELETE ",
+	} {
+		if strings.Contains(string(source), forbidden) {
+			t.Errorf("service.go contains persistence-boundary token %q", forbidden)
+		}
 	}
 }

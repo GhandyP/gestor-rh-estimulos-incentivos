@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"path/filepath"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"estimulos-incentivos/internal/domain"
+	"estimulos-incentivos/internal/store"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -57,8 +57,8 @@ func TestWithTxCommitPersists(t *testing.T) {
 	ctx := context.Background()
 
 	e := testEmpleado()
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
-		return s.CreateEmpleadoTx(ctx, tx, e)
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
+		return tx.CreateEmpleado(ctx, e)
 	}); err != nil {
 		t.Fatalf("WithTx: %v", err)
 	}
@@ -77,12 +77,12 @@ func TestWithTxRollbackOnError(t *testing.T) {
 	ctx := context.Background()
 
 	boom := errors.New("injected failure")
-	err := s.WithTx(ctx, func(tx *sql.Tx) error {
+	err := s.WithTx(ctx, func(tx store.Transaction) error {
 		e := testEmpleado()
-		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
-		if err := s.CreatePerfilMAPTx(ctx, tx, testPerfil(e.ID)); err != nil {
+		if err := tx.CreatePerfilMAP(ctx, testPerfil(e.ID)); err != nil {
 			return err
 		}
 		return boom
@@ -128,14 +128,14 @@ func TestTxWorkflowPersistsAllEntities(t *testing.T) {
 	ctx := context.Background()
 
 	e := testEmpleado()
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
-		if err := s.CreatePerfilMAPTx(ctx, tx, testPerfil(e.ID)); err != nil {
+		if err := tx.CreatePerfilMAP(ctx, testPerfil(e.ID)); err != nil {
 			return err
 		}
-		return s.CreateUmbralTx(ctx, tx, testUmbral(e.ID))
+		return tx.CreateUmbral(ctx, testUmbral(e.ID))
 	}); err != nil {
 		t.Fatalf("WithTx workflow: %v", err)
 	}
@@ -177,9 +177,9 @@ func TestTransitionEstimuloTxConditional(t *testing.T) {
 
 	// First transition wins.
 	var first bool
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
 		var err error
-		first, err = s.TransitionEstimuloTx(ctx, tx, est.ID, time.Now().UTC())
+		first, err = tx.TransitionEstimulo(ctx, est.ID, time.Now().UTC())
 		return err
 	}); err != nil {
 		t.Fatalf("first transition: %v", err)
@@ -201,9 +201,9 @@ func TestTransitionEstimuloTxConditional(t *testing.T) {
 
 	// Second transition loses.
 	var second bool
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
 		var err error
-		second, err = s.TransitionEstimuloTx(ctx, tx, est.ID, time.Now().UTC())
+		second, err = tx.TransitionEstimulo(ctx, est.ID, time.Now().UTC())
 		return err
 	}); err != nil {
 		t.Fatalf("second transition: %v", err)
@@ -218,9 +218,9 @@ func TestTransitionEstimuloTxMissingStimulus(t *testing.T) {
 	ctx := context.Background()
 
 	var applied bool
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
 		var err error
-		applied, err = s.TransitionEstimuloTx(ctx, tx, 999, time.Now().UTC())
+		applied, err = tx.TransitionEstimulo(ctx, 999, time.Now().UTC())
 		return err
 	}); err != nil {
 		t.Fatalf("transition: %v", err)
@@ -273,9 +273,9 @@ func TestTransitionEstimuloTxConcurrentOneWinner(t *testing.T) {
 			<-start
 			results[i], errs[i] = func() (bool, error) {
 				var applied bool
-				err := s.WithTx(ctx, func(tx *sql.Tx) error {
+				err := s.WithTx(ctx, func(tx store.Transaction) error {
 					var err error
-					applied, err = s.TransitionEstimuloTx(ctx, tx, est.ID, time.Now().UTC())
+					applied, err = tx.TransitionEstimulo(ctx, est.ID, time.Now().UTC())
 					if err != nil {
 						return err
 					}
@@ -283,7 +283,7 @@ func TestTransitionEstimuloTxConcurrentOneWinner(t *testing.T) {
 						return nil
 					}
 					// Solo el ganador escribe el historial, como hace el service.
-					return s.AddHistorialTx(ctx, tx, u.ID, domain.PuntoHistorial{
+					return tx.AddHistorial(ctx, u.ID, domain.PuntoHistorial{
 						Fecha:        time.Now(),
 						Intensidad:   0.6,
 						RespuestaMAP: 0.7,
@@ -343,15 +343,15 @@ func TestMultiEntityWorkflowRollbackLeavesNoPartialState(t *testing.T) {
 	ctx := context.Background()
 
 	boom := errors.New("injected failure after third write")
-	err := s.WithTx(ctx, func(tx *sql.Tx) error {
+	err := s.WithTx(ctx, func(tx store.Transaction) error {
 		e := testEmpleado()
-		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
-		if err := s.CreatePerfilMAPTx(ctx, tx, testPerfil(e.ID)); err != nil {
+		if err := tx.CreatePerfilMAP(ctx, testPerfil(e.ID)); err != nil {
 			return err
 		}
-		if err := s.CreateUmbralTx(ctx, tx, testUmbral(e.ID)); err != nil {
+		if err := tx.CreateUmbral(ctx, testUmbral(e.ID)); err != nil {
 			return err
 		}
 		return boom
@@ -377,16 +377,16 @@ func TestUmbralHistorialTxVariants(t *testing.T) {
 
 	e := testEmpleado()
 	var umbralID int64
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
 		u := testUmbral(e.ID)
-		if err := s.CreateUmbralTx(ctx, tx, u); err != nil {
+		if err := tx.CreateUmbral(ctx, u); err != nil {
 			return err
 		}
 		umbralID = u.ID
-		if err := s.AddHistorialTx(ctx, tx, u.ID, domain.PuntoHistorial{
+		if err := tx.AddHistorial(ctx, u.ID, domain.PuntoHistorial{
 			Fecha:        time.Now(),
 			Intensidad:   0.4,
 			RespuestaMAP: 0.7,
@@ -394,14 +394,14 @@ func TestUmbralHistorialTxVariants(t *testing.T) {
 		}); err != nil {
 			return err
 		}
-		u2, err := s.GetUmbralTx(ctx, tx, e.ID)
+		u2, err := tx.GetUmbral(ctx, e.ID)
 		if err != nil {
 			return err
 		}
 		u2.UltimoEstimulo = 0.4
 		now := time.Now()
 		u2.FechaUltimoEstimulo = &now
-		return s.UpdateUmbralTx(ctx, tx, u2)
+		return tx.UpdateUmbral(ctx, u2)
 	}); err != nil {
 		t.Fatalf("tx workflow: %v", err)
 	}
@@ -423,5 +423,191 @@ func TestUmbralHistorialTxVariants(t *testing.T) {
 	}
 	if umbral.UltimoEstimulo != 0.4 {
 		t.Fatalf("umbral.UltimoEstimulo = %v, want 0.4", umbral.UltimoEstimulo)
+	}
+}
+
+func TestCountEmpleados(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	count, err := s.CountEmpleados(ctx)
+	if err != nil {
+		t.Fatalf("CountEmpleados on empty store: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("CountEmpleados on empty store = %d, want 0", count)
+	}
+
+	first := testEmpleado()
+	second := testEmpleado()
+	second.Email = "juan@empresa.com"
+	for _, e := range []*domain.Empleado{first, second} {
+		if err := s.CreateEmpleado(ctx, e); err != nil {
+			t.Fatalf("CreateEmpleado: %v", err)
+		}
+	}
+
+	count, err = s.CountEmpleados(ctx)
+	if err != nil {
+		t.Fatalf("CountEmpleados: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("CountEmpleados = %d, want 2", count)
+	}
+}
+
+func TestUpdateNudgePersistsChanges(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	n := &domain.Nudge{
+		Nombre:      "Original",
+		Descripcion: "Descripción original",
+		Tipo:        domain.NudgeDefaults,
+		Ambito:      domain.AmbitoGlobal,
+		Activo:      true,
+	}
+	if err := s.CreateNudge(ctx, n); err != nil {
+		t.Fatalf("CreateNudge: %v", err)
+	}
+
+	n.Nombre = "Actualizado"
+	n.Descripcion = "Descripción actualizada"
+	n.Activo = false
+	if err := s.UpdateNudge(ctx, n); err != nil {
+		t.Fatalf("UpdateNudge: %v", err)
+	}
+
+	got, err := s.GetNudge(ctx, n.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetNudge after update = %v, %v", got, err)
+	}
+	if got.Nombre != n.Nombre || got.Descripcion != n.Descripcion || got.Activo != n.Activo {
+		t.Fatalf("updated nudge = %+v, want name=%q description=%q active=%t", got, n.Nombre, n.Descripcion, n.Activo)
+	}
+}
+
+func TestListEstimulosFiltersAndPreservesOrdering(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	empleado := testEmpleado()
+	if err := s.CreateEmpleado(ctx, empleado); err != nil {
+		t.Fatalf("CreateEmpleado: %v", err)
+	}
+
+	base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	appliedAt := base.Add(5 * time.Hour)
+	pendingLate := &domain.Estimulo{
+		EmpleadoID: empleado.ID,
+		Tipo:       "pending-late",
+		Contenido:  "Late",
+		Intensidad: 0.4,
+		Canal:      domain.CanalEmail,
+		Estado:     domain.EstadoPendiente,
+		FechaIdeal: base.Add(3 * time.Hour),
+	}
+	pendingEarly := &domain.Estimulo{
+		EmpleadoID: empleado.ID,
+		Tipo:       "pending-early",
+		Contenido:  "Early",
+		Intensidad: 0.5,
+		Canal:      domain.CanalEmail,
+		Estado:     domain.EstadoPendiente,
+		FechaIdeal: base.Add(1 * time.Hour),
+	}
+	applied := &domain.Estimulo{
+		EmpleadoID:    empleado.ID,
+		Tipo:          "applied",
+		Contenido:     "Applied",
+		Intensidad:    0.6,
+		Canal:         domain.CanalEmail,
+		Estado:        domain.EstadoAplicado,
+		FechaIdeal:    base.Add(4 * time.Hour),
+		FechaAplicado: &appliedAt,
+	}
+	stimuli := []*domain.Estimulo{pendingLate, pendingEarly, applied}
+	createdAt := []time.Time{base.Add(1 * time.Hour), base.Add(2 * time.Hour), base.Add(3 * time.Hour)}
+	for i, stimulus := range stimuli {
+		if err := s.CreateEstimulo(ctx, stimulus); err != nil {
+			t.Fatalf("CreateEstimulo(%s): %v", stimulus.Tipo, err)
+		}
+		if _, err := s.db.ExecContext(ctx, "UPDATE estimulos SET created_at=? WHERE id=?", createdAt[i].Format(time.RFC3339), stimulus.ID); err != nil {
+			t.Fatalf("set created_at for %s: %v", stimulus.Tipo, err)
+		}
+	}
+
+	checks := []struct {
+		estado string
+		want   []int64
+	}{
+		{"pendiente", []int64{pendingEarly.ID, pendingLate.ID}},
+		{"aplicado", []int64{applied.ID}},
+		{"todos", []int64{applied.ID, pendingEarly.ID, pendingLate.ID}},
+		{"", []int64{applied.ID, pendingEarly.ID, pendingLate.ID}},
+	}
+	for _, check := range checks {
+		got, err := s.ListEstimulos(ctx, check.estado)
+		if err != nil {
+			t.Fatalf("ListEstimulos(%q): %v", check.estado, err)
+		}
+		if len(got) != len(check.want) {
+			t.Fatalf("ListEstimulos(%q) length = %d, want %d", check.estado, len(got), len(check.want))
+		}
+		for i, wantID := range check.want {
+			if got[i].ID != wantID {
+				t.Fatalf("ListEstimulos(%q)[%d].ID = %d, want %d", check.estado, i, got[i].ID, wantID)
+			}
+		}
+	}
+}
+
+func TestTransactionStimulusTransitionRollsBack(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	empleado := testEmpleado()
+	if err := s.CreateEmpleado(ctx, empleado); err != nil {
+		t.Fatalf("CreateEmpleado: %v", err)
+	}
+	stimulus := &domain.Estimulo{
+		EmpleadoID: empleado.ID,
+		Tipo:       "recomendacion_personalizada",
+		Contenido:  "Oportunidad de desarrollo profesional",
+		Intensidad: 0.6,
+		Canal:      domain.CanalEmail,
+		Estado:     domain.EstadoPendiente,
+		FechaIdeal: time.Now(),
+	}
+	if err := s.CreateEstimulo(ctx, stimulus); err != nil {
+		t.Fatalf("CreateEstimulo: %v", err)
+	}
+
+	boom := errors.New("injected transition failure")
+	var transitioned bool
+	err := s.WithTx(ctx, func(tx store.Transaction) error {
+		var err error
+		transitioned, err = tx.TransitionEstimulo(ctx, stimulus.ID, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		return boom
+	})
+	if !errors.Is(err, boom) {
+		t.Fatalf("WithTx error = %v, want %v", err, boom)
+	}
+	if !transitioned {
+		t.Fatal("transaction transition = false, want true before rollback")
+	}
+
+	got, err := s.GetEstimulo(ctx, stimulus.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetEstimulo after rollback = %v, %v", got, err)
+	}
+	if got.Estado != domain.EstadoPendiente {
+		t.Fatalf("stimulus state after rollback = %q, want %q", got.Estado, domain.EstadoPendiente)
+	}
+	if got.FechaAplicado != nil {
+		t.Fatal("stimulus fecha_aplicado after rollback is set, want nil")
 	}
 }

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -11,15 +10,15 @@ import (
 
 	"estimulos-incentivos/internal/domain"
 	"estimulos-incentivos/internal/engine"
-	"estimulos-incentivos/internal/store/sqlite"
+	"estimulos-incentivos/internal/store"
 )
 
 type Service struct {
-	store *sqlite.Store
+	store store.Repository
 }
 
-func New(store *sqlite.Store) *Service {
-	return &Service{store: store}
+func New(repository store.Repository) *Service {
+	return &Service{store: repository}
 }
 
 // ApplyResult describe el resultado de aplicar un estímulo.
@@ -54,22 +53,22 @@ func (s *Service) CreateEmpleado(ctx context.Context, nombre, email, cargo, depa
 	}
 	umbral := engine.UmbralInicial(0)
 
-	err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.store.CreateEmpleadoTx(ctx, tx, e); err != nil {
+	err := s.store.WithTx(ctx, func(tx store.Transaction) error {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
 		perfil.EmpleadoID = e.ID
 		if err := perfil.Validate(); err != nil {
 			return fmt.Errorf("validar perfil: %w", err)
 		}
-		if err := s.store.CreatePerfilMAPTx(ctx, tx, perfil); err != nil {
+		if err := tx.CreatePerfilMAP(ctx, perfil); err != nil {
 			return err
 		}
 		umbral.EmpleadoID = e.ID
 		if err := umbral.Validate(); err != nil {
 			return fmt.Errorf("validar umbral: %w", err)
 		}
-		return s.store.CreateUmbralTx(ctx, tx, &umbral)
+		return tx.CreateUmbral(ctx, &umbral)
 	})
 	if err != nil {
 		return nil, err
@@ -237,7 +236,7 @@ func (s *Service) Analizar(ctx context.Context) (*engine.AnalisisResult, error) 
 // Estimulos pendientes
 
 func (s *Service) ListEstimulosPendientes(ctx context.Context) ([]domain.Estimulo, error) {
-	return s.store.ListEstimulosPendientes(ctx)
+	return s.store.ListEstimulos(ctx, "pendiente")
 }
 
 // ApplyEstimulo aplica un estímulo pendiente de forma idempotente y atómica:
@@ -258,8 +257,8 @@ func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta
 	}
 
 	result := ApplyResult{}
-	err = s.store.WithTx(ctx, func(tx *sql.Tx) error {
-		applied, err := s.store.TransitionEstimuloTx(ctx, tx, estimuloID, time.Now().UTC())
+	err = s.store.WithTx(ctx, func(tx store.Transaction) error {
+		applied, err := tx.TransitionEstimulo(ctx, estimuloID, time.Now().UTC())
 		if err != nil {
 			return err
 		}
@@ -268,7 +267,7 @@ func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta
 			return nil
 		}
 
-		umbral, err := s.store.GetUmbralTx(ctx, tx, estimulo.EmpleadoID)
+		umbral, err := tx.GetUmbral(ctx, estimulo.EmpleadoID)
 		if err != nil || umbral == nil {
 			if err == nil {
 				err = fmt.Errorf("no encontrado")
@@ -276,7 +275,7 @@ func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta
 			return fmt.Errorf("get umbral para empleado %d: %w", estimulo.EmpleadoID, err)
 		}
 
-		if err := s.store.AddHistorialTx(ctx, tx, umbral.ID, domain.PuntoHistorial{
+		if err := tx.AddHistorial(ctx, umbral.ID, domain.PuntoHistorial{
 			Fecha:        time.Now(),
 			Intensidad:   estimulo.Intensidad,
 			RespuestaMAP: respuesta,
@@ -285,7 +284,7 @@ func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta
 			return fmt.Errorf("add historial: %w", err)
 		}
 
-		historial, err := s.store.GetHistorialTx(ctx, tx, umbral.ID)
+		historial, err := tx.GetHistorial(ctx, umbral.ID)
 		if err != nil {
 			return fmt.Errorf("get historial: %w", err)
 		}
@@ -294,7 +293,7 @@ func (s *Service) ApplyEstimulo(ctx context.Context, estimuloID int64, respuesta
 		if err := calibrado.Validate(); err != nil {
 			return fmt.Errorf("validar umbral recalibrado: %w", err)
 		}
-		if err := s.store.UpdateUmbralTx(ctx, tx, &calibrado); err != nil {
+		if err := tx.UpdateUmbral(ctx, &calibrado); err != nil {
 			return fmt.Errorf("update umbral: %w", err)
 		}
 
@@ -490,14 +489,7 @@ func (s *Service) GetNudge(ctx context.Context, id int64) (*domain.Nudge, error)
 
 // UpdateNudge actualiza un nudge.
 func (s *Service) UpdateNudge(ctx context.Context, n *domain.Nudge) error {
-	// El store actual no tiene UpdateNudge. Usamos DB directa.
-	now := time.Now().UTC()
-	_, err := s.store.DB().ExecContext(ctx,
-		`UPDATE nudges SET nombre=?, descripcion=?, tipo=?, ambito=?, target_id=?, activo=?, updated_at=?
-		 WHERE id=?`,
-		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.Activo, now, n.ID,
-	)
-	return err
+	return s.store.UpdateNudge(ctx, n)
 }
 
 // --- Estímulos extendidos ---
@@ -510,43 +502,7 @@ func (s *Service) GetEstimulo(ctx context.Context, id int64) (*domain.Estimulo, 
 // ListEstimulos lista estímulos con filtro por estado.
 // estado: "pendiente", "aplicado", "todos" o vacío (todos).
 func (s *Service) ListEstimulos(ctx context.Context, estado string) ([]domain.Estimulo, error) {
-	if estado == "pendiente" {
-		return s.store.ListEstimulosPendientes(ctx)
-	}
-
-	var rows *sql.Rows
-	var err error
-	if estado == "aplicado" {
-		rows, err = s.store.DB().QueryContext(ctx,
-			`SELECT id, empleado_id, tipo, contenido, intensidad, canal, estado, fecha_ideal, fecha_aplicado, origen_recomendacion, created_at
-			 FROM estimulos WHERE estado='aplicado' ORDER BY created_at DESC`)
-	} else {
-		rows, err = s.store.DB().QueryContext(ctx,
-			`SELECT id, empleado_id, tipo, contenido, intensidad, canal, estado, fecha_ideal, fecha_aplicado, origen_recomendacion, created_at
-			 FROM estimulos ORDER BY created_at DESC`)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("list estimulos: %w", err)
-	}
-	defer rows.Close()
-
-	var estimulos []domain.Estimulo
-	for rows.Next() {
-		var e domain.Estimulo
-		var fechaIdeal, createdAt string
-		var fechaAplicado sql.NullString
-		if err := rows.Scan(&e.ID, &e.EmpleadoID, &e.Tipo, &e.Contenido, &e.Intensidad, &e.Canal, &e.Estado, &fechaIdeal, &fechaAplicado, &e.OrigenRecomendacion, &createdAt); err != nil {
-			return nil, fmt.Errorf("scan estimulo: %w", err)
-		}
-		e.FechaIdeal, _ = time.Parse(time.RFC3339, fechaIdeal)
-		if fechaAplicado.Valid {
-			t, _ := time.Parse(time.RFC3339, fechaAplicado.String)
-			e.FechaAplicado = &t
-		}
-		e.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-		estimulos = append(estimulos, e)
-	}
-	return estimulos, rows.Err()
+	return s.store.ListEstimulos(ctx, estado)
 }
 
 // --- Operaciones adicionales ---
@@ -605,8 +561,10 @@ func (s *Service) GetIncentivoDetail(ctx context.Context, id int64) (*IncentivoD
 // Seed data for demo
 
 func (s *Service) Seed(ctx context.Context) error {
-	var count int
-	s.store.DB().QueryRowContext(ctx, "SELECT count(*) FROM empleados").Scan(&count)
+	count, err := s.store.CountEmpleados(ctx)
+	if err != nil {
+		return fmt.Errorf("count empleados: %w", err)
+	}
 	if count > 0 {
 		return nil
 	}

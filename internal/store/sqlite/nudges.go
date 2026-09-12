@@ -66,3 +66,13 @@ func (s *Store) ListNudges(ctx context.Context) ([]domain.Nudge, error) {
 	}
 	return nudges, rows.Err()
 }
+
+func (s *Store) UpdateNudge(ctx context.Context, n *domain.Nudge) error {
+	now := time.Now().UTC()
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE nudges SET nombre=?, descripcion=?, tipo=?, ambito=?, target_id=?, activo=?, updated_at=?
+		 WHERE id=?`,
+		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.Activo, now, n.ID,
+	)
+	return err
+}

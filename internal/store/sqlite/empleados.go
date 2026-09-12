@@ -7,14 +7,11 @@ import (
 	"time"
 
 	"estimulos-incentivos/internal/domain"
+	"estimulos-incentivos/internal/store"
 )
 
 func (s *Store) CreateEmpleado(ctx context.Context, e *domain.Empleado) error {
 	return createEmpleado(ctx, s.db, e)
-}
-
-func (s *Store) CreateEmpleadoTx(ctx context.Context, tx *sql.Tx, e *domain.Empleado) error {
-	return createEmpleado(ctx, tx, e)
 }
 
 func createEmpleado(ctx context.Context, db execer, e *domain.Empleado) error {
@@ -35,12 +32,12 @@ func createEmpleado(ctx context.Context, db execer, e *domain.Empleado) error {
 }
 
 func (s *Store) CreateEmpleadoConPerfil(ctx context.Context, e *domain.Empleado, p *domain.PerfilMAP) error {
-	return s.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+	return s.WithTx(ctx, func(tx store.Transaction) error {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
 		p.EmpleadoID = e.ID
-		return s.CreatePerfilMAPTx(ctx, tx, p)
+		return tx.CreatePerfilMAP(ctx, p)
 	})
 }
 
@@ -87,6 +84,14 @@ func (s *Store) ListEmpleados(ctx context.Context) ([]domain.Empleado, error) {
 	return empleados, rows.Err()
 }
 
+func (s *Store) CountEmpleados(ctx context.Context) (int, error) {
+	var count int
+	if err := s.db.QueryRowContext(ctx, "SELECT count(*) FROM empleados").Scan(&count); err != nil {
+		return 0, fmt.Errorf("count empleados: %w", err)
+	}
+	return count, nil
+}
+
 func (s *Store) UpdateEmpleado(ctx context.Context, e *domain.Empleado) error {
 	now := time.Now().UTC()
 	_, err := s.db.ExecContext(ctx,
@@ -113,10 +118,6 @@ func (s *Store) DeleteEmpleado(ctx context.Context, id int64) error {
 
 func (s *Store) CreatePerfilMAP(ctx context.Context, p *domain.PerfilMAP) error {
 	return createPerfilMAP(ctx, s.db, p)
-}
-
-func (s *Store) CreatePerfilMAPTx(ctx context.Context, tx *sql.Tx, p *domain.PerfilMAP) error {
-	return createPerfilMAP(ctx, tx, p)
 }
 
 func createPerfilMAP(ctx context.Context, db execer, p *domain.PerfilMAP) error {

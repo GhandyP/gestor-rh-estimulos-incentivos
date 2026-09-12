@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"estimulos-incentivos/internal/domain"
+	"estimulos-incentivos/internal/store"
 )
 
 // openLegacy abre una base con el esquema 000001 únicamente (sin hardening),
@@ -188,14 +189,14 @@ func TestMigrate_DownPreservesDataAndDropsConstraints(t *testing.T) {
 
 	// Datos creados por el flujo real (tx-aware).
 	e := testEmpleado()
-	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.CreateEmpleadoTx(ctx, tx, e); err != nil {
+	if err := s.WithTx(ctx, func(tx store.Transaction) error {
+		if err := tx.CreateEmpleado(ctx, e); err != nil {
 			return err
 		}
-		if err := s.CreatePerfilMAPTx(ctx, tx, testPerfil(e.ID)); err != nil {
+		if err := tx.CreatePerfilMAP(ctx, testPerfil(e.ID)); err != nil {
 			return err
 		}
-		return s.CreateUmbralTx(ctx, tx, testUmbral(e.ID))
+		return tx.CreateUmbral(ctx, testUmbral(e.ID))
 	}); err != nil {
 		t.Fatalf("seed workflow: %v", err)
 	}
