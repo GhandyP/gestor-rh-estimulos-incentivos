@@ -10,8 +10,12 @@ import (
 )
 
 func (s *Store) CreateNudge(ctx context.Context, n *domain.Nudge) error {
+	return createNudge(ctx, s.db, n)
+}
+
+func createNudge(ctx context.Context, db execer, n *domain.Nudge) error {
 	now := time.Now().UTC()
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO nudges (nombre, descripcion, tipo, ambito, target_id, activo, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.Activo, now, now,

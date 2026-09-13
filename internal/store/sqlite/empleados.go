@@ -85,8 +85,12 @@ func (s *Store) ListEmpleados(ctx context.Context) ([]domain.Empleado, error) {
 }
 
 func (s *Store) CountEmpleados(ctx context.Context) (int, error) {
+	return countEmpleados(ctx, s.db)
+}
+
+func countEmpleados(ctx context.Context, db queryer) (int, error) {
 	var count int
-	if err := s.db.QueryRowContext(ctx, "SELECT count(*) FROM empleados").Scan(&count); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM empleados").Scan(&count); err != nil {
 		return 0, fmt.Errorf("count empleados: %w", err)
 	}
 	return count, nil

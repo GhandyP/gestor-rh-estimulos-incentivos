@@ -17,6 +17,10 @@ type transaction struct {
 
 var _ store.Transaction = (*transaction)(nil)
 
+func (t *transaction) CountEmpleados(ctx context.Context) (int, error) {
+	return countEmpleados(ctx, t.tx)
+}
+
 func (t *transaction) CreateEmpleado(ctx context.Context, e *domain.Empleado) error {
 	return createEmpleado(ctx, t.tx, e)
 }
@@ -27,6 +31,14 @@ func (t *transaction) CreatePerfilMAP(ctx context.Context, p *domain.PerfilMAP) 
 
 func (t *transaction) CreateUmbral(ctx context.Context, u *domain.Umbral) error {
 	return createUmbral(ctx, t.tx, u)
+}
+
+func (t *transaction) CreateIncentivo(ctx context.Context, i *domain.Incentivo) error {
+	return createIncentivo(ctx, t.tx, i)
+}
+
+func (t *transaction) CreateNudge(ctx context.Context, n *domain.Nudge) error {
+	return createNudge(ctx, t.tx, n)
 }
 
 func (t *transaction) TransitionEstimulo(ctx context.Context, id int64, at time.Time) (bool, error) {

@@ -10,8 +10,12 @@ import (
 )
 
 func (s *Store) CreateIncentivo(ctx context.Context, i *domain.Incentivo) error {
+	return createIncentivo(ctx, s.db, i)
+}
+
+func createIncentivo(ctx context.Context, db execer, i *domain.Incentivo) error {
 	now := time.Now().UTC()
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO incentivos (nombre, descripcion, tipo, intensidad, costo, disponibilidad, cupos, cupos_usados, activo, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		i.Nombre, i.Descripcion, i.Tipo, i.Intensidad, i.Costo, i.Disponibilidad, i.Cupos, i.CuposUsados, i.Activo, now, now,

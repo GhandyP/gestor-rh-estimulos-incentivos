@@ -263,6 +263,102 @@ func TestApplyEstimuloMissingStimulusFails(t *testing.T) {
 	}
 }
 
+func TestSeedPersistsAllDataAndIsIdempotent(t *testing.T) {
+	svc, store := newTestService(t)
+	ctx := context.Background()
+
+	if err := svc.Seed(ctx); err != nil {
+		t.Fatalf("first Seed: %v", err)
+	}
+
+	want := []struct {
+		table string
+		count int
+	}{
+		{"empleados", 6},
+		{"perfiles_map", 6},
+		{"umbrales", 6},
+		{"incentivos", 8},
+		{"nudges", 6},
+	}
+	for _, check := range want {
+		if got := countRows(t, store, check.table); got != check.count {
+			t.Fatalf("%s after first Seed = %d, want %d", check.table, got, check.count)
+		}
+	}
+
+	if err := svc.Seed(ctx); err != nil {
+		t.Fatalf("second Seed: %v", err)
+	}
+	for _, check := range want {
+		if got := countRows(t, store, check.table); got != check.count {
+			t.Fatalf("%s after idempotent Seed = %d, want %d", check.table, got, check.count)
+		}
+	}
+}
+
+func TestSeedRollsBackEverySeedTableAfterIntermediateFailure(t *testing.T) {
+	svc, store := newTestService(t)
+	ctx := context.Background()
+
+	// The trigger fires after all employees, MAP profiles, thresholds, and
+	// incentives have already been written by the seed transaction.
+	if _, err := store.DB().ExecContext(ctx, `CREATE TRIGGER fail_seed_nudge
+		BEFORE INSERT ON nudges BEGIN SELECT RAISE(ABORT, 'injected seed failure'); END;`); err != nil {
+		t.Fatalf("create trigger: %v", err)
+	}
+
+	if err := svc.Seed(ctx); err == nil {
+		t.Fatal("Seed() = nil, want injected failure")
+	}
+
+	for _, table := range []string{"empleados", "perfiles_map", "umbrales", "incentivos", "nudges"} {
+		if got := countRows(t, store, table); got != 0 {
+			t.Fatalf("%s after failed Seed = %d, want 0 (complete rollback)", table, got)
+		}
+	}
+}
+
+func TestSeedConcurrentCallsCreateOneSeedSet(t *testing.T) {
+	svc, store := newTestService(t)
+	ctx := context.Background()
+
+	const callers = 8
+	start := make(chan struct{})
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			errs[i] = svc.Seed(ctx)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent Seed call %d: %v", i, err)
+		}
+	}
+	for _, check := range []struct {
+		table string
+		count int
+	}{
+		{"empleados", 6},
+		{"perfiles_map", 6},
+		{"umbrales", 6},
+		{"incentivos", 8},
+		{"nudges", 6},
+	} {
+		if got := countRows(t, store, check.table); got != check.count {
+			t.Fatalf("%s after concurrent Seed = %d, want %d", check.table, got, check.count)
+		}
+	}
+}
+
 func TestServiceProductionSourceStaysAbovePersistenceBoundary(t *testing.T) {
 	_, testFile, _, ok := runtime.Caller(0)
 	if !ok {

@@ -561,117 +561,119 @@ func (s *Service) GetIncentivoDetail(ctx context.Context, id int64) (*IncentivoD
 // Seed data for demo
 
 func (s *Service) Seed(ctx context.Context) error {
-	count, err := s.store.CountEmpleados(ctx)
-	if err != nil {
-		return fmt.Errorf("count empleados: %w", err)
-	}
-	if count > 0 {
+	return s.store.WithTx(ctx, func(tx store.Transaction) error {
+		count, err := tx.CountEmpleados(ctx)
+		if err != nil {
+			return fmt.Errorf("count empleados: %w", err)
+		}
+		if count > 0 {
+			return nil
+		}
+
+		type seedEmpleado struct {
+			nombre, email, cargo, depto string
+			m, a, p                     float64
+			sensibilidad                domain.Sensibilidad
+		}
+
+		empleados := []seedEmpleado{
+			{"María García", "maria@empresa.com", "Senior Developer", "Ingeniería", 0.75, 0.85, 0.80, domain.SensibilidadDesarrollo},
+			{"Juan Pérez", "juan@empresa.com", "Junior Developer", "Ingeniería", 0.40, 0.90, 0.50, domain.SensibilidadReconocimiento},
+			{"Ana López", "ana@empresa.com", "Tech Lead", "Ingeniería", 0.85, 0.90, 0.85, domain.SensibilidadReconocimiento},
+			{"Carlos Ruiz", "carlos@empresa.com", "Sales Manager", "Ventas", 0.50, 0.60, 0.55, domain.SensibilidadEconomico},
+			{"Laura Díaz", "laura@empresa.com", "HR Specialist", "RRHH", 0.70, 0.40, 0.65, domain.SensibilidadBienestar},
+			{"Pedro Torres", "pedro@empresa.com", "UX Designer", "Diseño", 0.30, 0.85, 0.35, domain.SensibilidadDesarrollo},
+		}
+
+		for _, se := range empleados {
+			e := &domain.Empleado{
+				Nombre:       se.nombre,
+				Email:        se.email,
+				Cargo:        se.cargo,
+				Departamento: domain.Departamento(se.depto),
+				Activo:       true,
+			}
+			if err := tx.CreateEmpleado(ctx, e); err != nil {
+				return err
+			}
+
+			p := &domain.PerfilMAP{
+				EmpleadoID:    e.ID,
+				Motivacion:    se.m,
+				Habilidad:     se.a,
+				Prompt:        se.p,
+				Sensibilidad:  se.sensibilidad,
+				Confiabilidad: 0.70,
+			}
+			if err := tx.CreatePerfilMAP(ctx, p); err != nil {
+				return err
+			}
+
+			u := engine.UmbralInicial(e.ID)
+			if err := tx.CreateUmbral(ctx, &u); err != nil {
+				return err
+			}
+		}
+
+		// Incentivos de ejemplo
+		incentivos := []struct {
+			nombre, desc string
+			tipo         domain.TipoIncentivo
+			intensidad   float64
+			costo        float64
+		}{
+			{"Insignia Senior Craftsmanship", "Reconocimiento de excelencia técnica", domain.IncentivoIdentidad, 0.8, 100},
+			{"Embajador de Cultura", "Representar valores de la empresa", domain.IncentivoIdentidad, 0.7, 50},
+			{"Días Extra de Vacaciones", "3 días adicionales de vacaciones", domain.IncentivoBeneficios, 0.9, 500},
+			{"Presupuesto Home Office", "$500 para equipamiento", domain.IncentivoBeneficios, 0.6, 500},
+			{"Beca para Conferencia", "Entrada + viaje a conferencia tech", domain.IncentivoFormacion, 0.85, 1500},
+			{"Presupuesto de Libros", "$200 en libros técnicos", domain.IncentivoFormacion, 0.5, 200},
+			{"Liderar Comité de Innovación", "Liderar iniciativa estratégica", domain.IncentivoProyectoCorporativo, 0.9, 300},
+			{"Representante en Evento", "Representar empresa en feria", domain.IncentivoProyectoCorporativo, 0.7, 1000},
+		}
+
+		for _, inc := range incentivos {
+			i := &domain.Incentivo{
+				Nombre:         inc.nombre,
+				Descripcion:    inc.desc,
+				Tipo:           inc.tipo,
+				Intensidad:     inc.intensidad,
+				Costo:          inc.costo,
+				Disponibilidad: domain.DisponibilidadPermanente,
+				Activo:         true,
+			}
+			if err := tx.CreateIncentivo(ctx, i); err != nil {
+				return err
+			}
+		}
+
+		// Nudges de ejemplo
+		nudges := []struct {
+			nombre, desc string
+			tipo         domain.TipoNudge
+			ambito       domain.AmbitoNudge
+		}{
+			{"Evaluación 360° Pre-agendada", "Evaluación automática trimestral", domain.NudgeDefaults, domain.AmbitoGlobal},
+			{"Onboarding Automático", "Proceso de inducción sin pasos manuales", domain.NudgeDefaults, domain.AmbitoGlobal},
+			{"Team Completion Rate", "El 80% de tu equipo ya completó el plan", domain.NudgeSocialProof, domain.AmbitoGlobal},
+			{"Feedback como Oportunidad", "Enmarcar feedback positivamente", domain.NudgeFraming, domain.AmbitoGlobal},
+			{"One-click Capacitación", "Solicitar capacitación en un click", domain.NudgeFriccion, domain.AmbitoGlobal},
+			{"Formularios Auto-completados", "Pre-llenar solicitudes frecuentes", domain.NudgeFriccion, domain.AmbitoGlobal},
+		}
+
+		for _, nd := range nudges {
+			n := &domain.Nudge{
+				Nombre:      nd.nombre,
+				Descripcion: nd.desc,
+				Tipo:        nd.tipo,
+				Ambito:      nd.ambito,
+				Activo:      true,
+			}
+			if err := tx.CreateNudge(ctx, n); err != nil {
+				return err
+			}
+		}
+
 		return nil
-	}
-
-	type seedEmpleado struct {
-		nombre, email, cargo, depto string
-		m, a, p                     float64
-		sensibilidad                domain.Sensibilidad
-	}
-
-	empleados := []seedEmpleado{
-		{"María García", "maria@empresa.com", "Senior Developer", "Ingeniería", 0.75, 0.85, 0.80, domain.SensibilidadDesarrollo},
-		{"Juan Pérez", "juan@empresa.com", "Junior Developer", "Ingeniería", 0.40, 0.90, 0.50, domain.SensibilidadReconocimiento},
-		{"Ana López", "ana@empresa.com", "Tech Lead", "Ingeniería", 0.85, 0.90, 0.85, domain.SensibilidadReconocimiento},
-		{"Carlos Ruiz", "carlos@empresa.com", "Sales Manager", "Ventas", 0.50, 0.60, 0.55, domain.SensibilidadEconomico},
-		{"Laura Díaz", "laura@empresa.com", "HR Specialist", "RRHH", 0.70, 0.40, 0.65, domain.SensibilidadBienestar},
-		{"Pedro Torres", "pedro@empresa.com", "UX Designer", "Diseño", 0.30, 0.85, 0.35, domain.SensibilidadDesarrollo},
-	}
-
-	for _, se := range empleados {
-		e := &domain.Empleado{
-			Nombre:       se.nombre,
-			Email:        se.email,
-			Cargo:        se.cargo,
-			Departamento: domain.Departamento(se.depto),
-			Activo:       true,
-		}
-		if err := s.store.CreateEmpleado(ctx, e); err != nil {
-			return err
-		}
-
-		p := &domain.PerfilMAP{
-			EmpleadoID:    e.ID,
-			Motivacion:    se.m,
-			Habilidad:     se.a,
-			Prompt:        se.p,
-			Sensibilidad:  se.sensibilidad,
-			Confiabilidad: 0.70,
-		}
-		if err := s.store.CreatePerfilMAP(ctx, p); err != nil {
-			return err
-		}
-
-		u := engine.UmbralInicial(e.ID)
-		if err := s.store.CreateUmbral(ctx, &u); err != nil {
-			return err
-		}
-	}
-
-	// Incentivos de ejemplo
-	incentivos := []struct {
-		nombre, desc string
-		tipo         domain.TipoIncentivo
-		intensidad   float64
-		costo        float64
-	}{
-		{"Insignia Senior Craftsmanship", "Reconocimiento de excelencia técnica", domain.IncentivoIdentidad, 0.8, 100},
-		{"Embajador de Cultura", "Representar valores de la empresa", domain.IncentivoIdentidad, 0.7, 50},
-		{"Días Extra de Vacaciones", "3 días adicionales de vacaciones", domain.IncentivoBeneficios, 0.9, 500},
-		{"Presupuesto Home Office", "$500 para equipamiento", domain.IncentivoBeneficios, 0.6, 500},
-		{"Beca para Conferencia", "Entrada + viaje a conferencia tech", domain.IncentivoFormacion, 0.85, 1500},
-		{"Presupuesto de Libros", "$200 en libros técnicos", domain.IncentivoFormacion, 0.5, 200},
-		{"Liderar Comité de Innovación", "Liderar iniciativa estratégica", domain.IncentivoProyectoCorporativo, 0.9, 300},
-		{"Representante en Evento", "Representar empresa en feria", domain.IncentivoProyectoCorporativo, 0.7, 1000},
-	}
-
-	for _, inc := range incentivos {
-		i := &domain.Incentivo{
-			Nombre:         inc.nombre,
-			Descripcion:    inc.desc,
-			Tipo:           inc.tipo,
-			Intensidad:     inc.intensidad,
-			Costo:          inc.costo,
-			Disponibilidad: domain.DisponibilidadPermanente,
-			Activo:         true,
-		}
-		if err := s.store.CreateIncentivo(ctx, i); err != nil {
-			return err
-		}
-	}
-
-	// Nudges de ejemplo
-	nudges := []struct {
-		nombre, desc string
-		tipo         domain.TipoNudge
-		ambito       domain.AmbitoNudge
-	}{
-		{"Evaluación 360° Pre-agendada", "Evaluación automática trimestral", domain.NudgeDefaults, domain.AmbitoGlobal},
-		{"Onboarding Automático", "Proceso de inducción sin pasos manuales", domain.NudgeDefaults, domain.AmbitoGlobal},
-		{"Team Completion Rate", "El 80% de tu equipo ya completó el plan", domain.NudgeSocialProof, domain.AmbitoGlobal},
-		{"Feedback como Oportunidad", "Enmarcar feedback positivamente", domain.NudgeFraming, domain.AmbitoGlobal},
-		{"One-click Capacitación", "Solicitar capacitación en un click", domain.NudgeFriccion, domain.AmbitoGlobal},
-		{"Formularios Auto-completados", "Pre-llenar solicitudes frecuentes", domain.NudgeFriccion, domain.AmbitoGlobal},
-	}
-
-	for _, nd := range nudges {
-		n := &domain.Nudge{
-			Nombre:      nd.nombre,
-			Descripcion: nd.desc,
-			Tipo:        nd.tipo,
-			Ambito:      nd.ambito,
-			Activo:      true,
-		}
-		if err := s.store.CreateNudge(ctx, n); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	})
 }

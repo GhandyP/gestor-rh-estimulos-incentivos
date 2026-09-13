@@ -11,9 +11,12 @@ import (
 // repository transaction. Concrete database transaction types stay behind
 // this boundary.
 type Transaction interface {
+	CountEmpleados(context.Context) (int, error)
 	CreateEmpleado(context.Context, *domain.Empleado) error
 	CreatePerfilMAP(context.Context, *domain.PerfilMAP) error
 	CreateUmbral(context.Context, *domain.Umbral) error
+	CreateIncentivo(context.Context, *domain.Incentivo) error
+	CreateNudge(context.Context, *domain.Nudge) error
 
 	TransitionEstimulo(context.Context, int64, time.Time) (bool, error)
 	GetUmbral(context.Context, int64) (*domain.Umbral, error)
