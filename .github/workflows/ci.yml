@@ -54,4 +54,4 @@ jobs:
           fi
 
       - name: Compose smoke
-        run: ./scripts/compose-smoke.sh
+        run: bash ./scripts/compose-smoke.sh
