@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"sort"
+
 	"estimulos-incentivos/internal/domain"
 )
 
@@ -82,6 +84,10 @@ func Analizar(
 			TotalEmpleados: d.count,
 		})
 	}
+	// Orden determinista: la iteración de mapas es aleatoria en Go.
+	sort.Slice(result.Distribuciones, func(i, j int) bool {
+		return result.Distribuciones[i].Depto < result.Distribuciones[j].Depto
+	})
 
 	// Zona de riesgo
 	result.ZonaRiesgo = DetectarRiesgo(empleados, perfiles, 0.25)
@@ -113,6 +119,10 @@ func Analizar(
 			TasaExito:      float64(s.exitos) / float64(s.total),
 		})
 	}
+	// Orden determinista: la iteración de mapas es aleatoria en Go.
+	sort.Slice(result.Efectividad, func(i, j int) bool {
+		return result.Efectividad[i].Tipo < result.Efectividad[j].Tipo
+	})
 
 	// Totales
 	result.TotalEmpleados = len(empleados)
