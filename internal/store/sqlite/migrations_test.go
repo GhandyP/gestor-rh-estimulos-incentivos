@@ -50,8 +50,8 @@ func TestMigrate_AppliesOnceAndIsIdempotent(t *testing.T) {
 		versions = append(versions, v)
 	}
 	rows.Close()
-	if len(versions) != 2 || versions[0] != "000001_initial_schema" || versions[1] != "000002_hardening" {
-		t.Fatalf("applied versions = %v, want [000001_initial_schema 000002_hardening]", versions)
+	if len(versions) != 3 || versions[0] != "000001_initial_schema" || versions[1] != "000002_hardening" || versions[2] != "000003_nudge_target_depto" {
+		t.Fatalf("applied versions = %v, want [000001_initial_schema 000002_hardening 000003_nudge_target_depto]", versions)
 	}
 	s1.Close()
 

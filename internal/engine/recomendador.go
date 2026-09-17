@@ -99,8 +99,10 @@ func recomendarNudges(nudges []domain.Nudge, empleado domain.Empleado) []domain.
 		if !n.Activo {
 			continue
 		}
-		// Solo nudges globales o que apliquen al depto del empleado
+		// Nudges globales, del departamento del empleado o dirigidos
+		// individualmente a él.
 		if n.Ambito == domain.AmbitoGlobal ||
+			(n.Ambito == domain.AmbitoDepartamento && n.TargetDepto == string(empleado.Departamento)) ||
 			(n.Ambito == domain.AmbitoIndividual && n.TargetID == empleado.ID) {
 			recomendados = append(recomendados, n)
 		}

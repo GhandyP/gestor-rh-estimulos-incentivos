@@ -143,13 +143,14 @@ func (s *Service) ListIncentivos(ctx context.Context) ([]domain.Incentivo, error
 
 // Nudges
 
-func (s *Service) CreateNudge(ctx context.Context, nombre, descripcion string, tipo domain.TipoNudge, ambito domain.AmbitoNudge, targetID int64) (*domain.Nudge, error) {
+func (s *Service) CreateNudge(ctx context.Context, nombre, descripcion string, tipo domain.TipoNudge, ambito domain.AmbitoNudge, targetID int64, targetDepto string) (*domain.Nudge, error) {
 	n := &domain.Nudge{
 		Nombre:      nombre,
 		Descripcion: descripcion,
 		Tipo:        tipo,
 		Ambito:      ambito,
 		TargetID:    targetID,
+		TargetDepto: targetDepto,
 		Activo:      true,
 	}
 	if err := s.store.CreateNudge(ctx, n); err != nil {

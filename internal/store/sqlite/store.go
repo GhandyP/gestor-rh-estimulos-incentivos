@@ -100,6 +100,11 @@ func (s *Store) migrate() error {
 		return err
 	}
 
+	// v3: objetivo textual de nudges de departamento.
+	if err := s.applyPending(ctx, "000003_nudge_target_depto"); err != nil {
+		return err
+	}
+
 	return nil
 }
 

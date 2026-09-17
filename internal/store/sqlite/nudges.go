@@ -16,9 +16,9 @@ func (s *Store) CreateNudge(ctx context.Context, n *domain.Nudge) error {
 func createNudge(ctx context.Context, db execer, n *domain.Nudge) error {
 	now := time.Now().UTC()
 	res, err := db.ExecContext(ctx,
-		`INSERT INTO nudges (nombre, descripcion, tipo, ambito, target_id, activo, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.Activo, now, now,
+		`INSERT INTO nudges (nombre, descripcion, tipo, ambito, target_id, target_depto, activo, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.TargetDepto, n.Activo, now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("create nudge: %w", err)
@@ -34,9 +34,9 @@ func (s *Store) GetNudge(ctx context.Context, id int64) (*domain.Nudge, error) {
 	n := &domain.Nudge{}
 	var createdAt, updatedAt string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, nombre, descripcion, tipo, ambito, target_id, activo, created_at, updated_at
+		`SELECT id, nombre, descripcion, tipo, ambito, target_id, target_depto, activo, created_at, updated_at
 		 FROM nudges WHERE id = ?`, id,
-	).Scan(&n.ID, &n.Nombre, &n.Descripcion, &n.Tipo, &n.Ambito, &n.TargetID, &n.Activo, &createdAt, &updatedAt)
+	).Scan(&n.ID, &n.Nombre, &n.Descripcion, &n.Tipo, &n.Ambito, &n.TargetID, &n.TargetDepto, &n.Activo, &createdAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -50,7 +50,7 @@ func (s *Store) GetNudge(ctx context.Context, id int64) (*domain.Nudge, error) {
 
 func (s *Store) ListNudges(ctx context.Context) ([]domain.Nudge, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, nombre, descripcion, tipo, ambito, target_id, activo, created_at, updated_at
+		`SELECT id, nombre, descripcion, tipo, ambito, target_id, target_depto, activo, created_at, updated_at
 		 FROM nudges WHERE activo = 1 ORDER BY tipo, nombre`)
 	if err != nil {
 		return nil, fmt.Errorf("list nudges: %w", err)
@@ -61,7 +61,7 @@ func (s *Store) ListNudges(ctx context.Context) ([]domain.Nudge, error) {
 	for rows.Next() {
 		var n domain.Nudge
 		var createdAt, updatedAt string
-		if err := rows.Scan(&n.ID, &n.Nombre, &n.Descripcion, &n.Tipo, &n.Ambito, &n.TargetID, &n.Activo, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Nombre, &n.Descripcion, &n.Tipo, &n.Ambito, &n.TargetID, &n.TargetDepto, &n.Activo, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan nudge: %w", err)
 		}
 		n.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
@@ -74,9 +74,9 @@ func (s *Store) ListNudges(ctx context.Context) ([]domain.Nudge, error) {
 func (s *Store) UpdateNudge(ctx context.Context, n *domain.Nudge) error {
 	now := time.Now().UTC()
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE nudges SET nombre=?, descripcion=?, tipo=?, ambito=?, target_id=?, activo=?, updated_at=?
+		`UPDATE nudges SET nombre=?, descripcion=?, tipo=?, ambito=?, target_id=?, target_depto=?, activo=?, updated_at=?
 		 WHERE id=?`,
-		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.Activo, now, n.ID,
+		n.Nombre, n.Descripcion, n.Tipo, n.Ambito, n.TargetID, n.TargetDepto, n.Activo, now, n.ID,
 	)
 	return err
 }

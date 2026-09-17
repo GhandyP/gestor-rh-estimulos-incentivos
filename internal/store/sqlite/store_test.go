@@ -487,6 +487,51 @@ func TestUpdateNudgePersistsChanges(t *testing.T) {
 	}
 }
 
+func TestNudgeTargetDeptoRoundtrip(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	n := &domain.Nudge{
+		Nombre:      "Defaults Ventas",
+		Descripcion: "Defaults del departamento Ventas",
+		Tipo:        domain.NudgeDefaults,
+		Ambito:      domain.AmbitoDepartamento,
+		TargetDepto: "Ventas",
+		Activo:      true,
+	}
+	if err := s.CreateNudge(ctx, n); err != nil {
+		t.Fatalf("CreateNudge: %v", err)
+	}
+
+	got, err := s.GetNudge(ctx, n.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetNudge = %v, %v", got, err)
+	}
+	if got.TargetDepto != "Ventas" || got.Ambito != domain.AmbitoDepartamento {
+		t.Fatalf("GetNudge TargetDepto = %q Ambito = %q, want Ventas/departamento", got.TargetDepto, got.Ambito)
+	}
+
+	listed, err := s.ListNudges(ctx)
+	if err != nil {
+		t.Fatalf("ListNudges: %v", err)
+	}
+	if len(listed) != 1 || listed[0].TargetDepto != "Ventas" {
+		t.Fatalf("ListNudges = %+v, want TargetDepto Ventas", listed)
+	}
+
+	n.TargetDepto = "Marketing"
+	if err := s.UpdateNudge(ctx, n); err != nil {
+		t.Fatalf("UpdateNudge: %v", err)
+	}
+	got, err = s.GetNudge(ctx, n.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetNudge after update = %v, %v", got, err)
+	}
+	if got.TargetDepto != "Marketing" {
+		t.Fatalf("TargetDepto after update = %q, want Marketing", got.TargetDepto)
+	}
+}
+
 func TestListEstimulosFiltersAndPreservesOrdering(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

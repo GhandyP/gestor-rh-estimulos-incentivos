@@ -29,7 +29,8 @@ type Nudge struct {
 	Descripcion string      `json:"descripcion"`
 	Tipo        TipoNudge   `json:"tipo"`
 	Ambito      AmbitoNudge `json:"ambito"`
-	TargetID    int64       `json:"target_id,omitempty"` // ID del departamento o empleado si no es global
+	TargetID    int64       `json:"target_id,omitempty"`    // ID del empleado si el ámbito es individual
+	TargetDepto string      `json:"target_depto,omitempty"` // Departamento objetivo si el ámbito es departamento
 	Activo      bool        `json:"activo"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`

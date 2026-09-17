@@ -665,12 +665,13 @@ func (h *Handler) UpdateNudgeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input struct {
-		Nombre      string `json:"nombre"`
-		Descripcion string `json:"descripcion"`
-		Tipo        string `json:"tipo"`
-		Ambito      string `json:"ambito"`
-		TargetID    *int64 `json:"target_id"`
-		Activo      *bool  `json:"activo"`
+		Nombre      string  `json:"nombre"`
+		Descripcion string  `json:"descripcion"`
+		Tipo        string  `json:"tipo"`
+		Ambito      string  `json:"ambito"`
+		TargetID    *int64  `json:"target_id"`
+		TargetDepto *string `json:"target_depto"`
+		Activo      *bool   `json:"activo"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
@@ -691,6 +692,9 @@ func (h *Handler) UpdateNudgeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	if input.TargetID != nil {
 		n.TargetID = *input.TargetID
+	}
+	if input.TargetDepto != nil {
+		n.TargetDepto = *input.TargetDepto
 	}
 	if input.Activo != nil {
 		n.Activo = *input.Activo
@@ -911,6 +915,7 @@ func (h *Handler) CreateNudgeAPI(w http.ResponseWriter, r *http.Request) {
 		Tipo        string `json:"tipo"`
 		Ambito      string `json:"ambito"`
 		TargetID    int64  `json:"target_id"`
+		TargetDepto string `json:"target_depto"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
@@ -918,7 +923,7 @@ func (h *Handler) CreateNudgeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	nudge, err := h.Svc.CreateNudge(r.Context(),
 		input.Nombre, input.Descripcion,
-		domain.TipoNudge(input.Tipo), domain.AmbitoNudge(input.Ambito), input.TargetID)
+		domain.TipoNudge(input.Tipo), domain.AmbitoNudge(input.Ambito), input.TargetID, input.TargetDepto)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

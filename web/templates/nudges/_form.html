@@ -32,9 +32,13 @@
                 </select>
             </div>
             <div class="form-group">
-                <label class="form-label">Target ID (si no es global)</label>
+                <label class="form-label">Target ID (ámbito individual)</label>
                 <input class="form-input" type="number" name="target_id" value="0">
             </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento objetivo (ámbito departamento)</label>
+            <input class="form-input" type="text" name="target_depto" placeholder="Ej: IT">
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
             <button type="button" class="btn" onclick="this.closest('#nudge-form').remove()">Cancelar</button>
