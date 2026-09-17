@@ -19,6 +19,50 @@ func nudgeFixtureDepto(t *testing.T) (domain.Empleado, domain.PerfilMAP, domain.
 	return e, p, u
 }
 
+func TestRecomendar_NudgesCapSeleccionaPorNombre(t *testing.T) {
+	e, p, u := nudgeFixtureDepto(t)
+	nudges := []domain.Nudge{
+		{ID: 1, Nombre: "Zeta", Tipo: domain.NudgeFraming, Ambito: domain.AmbitoGlobal, Activo: true},
+		{ID: 2, Nombre: "Alfa", Tipo: domain.NudgeFraming, Ambito: domain.AmbitoGlobal, Activo: true},
+		{ID: 3, Nombre: "Yankee", Tipo: domain.NudgeFraming, Ambito: domain.AmbitoGlobal, Activo: true},
+		{ID: 4, Nombre: "Beta", Tipo: domain.NudgeFraming, Ambito: domain.AmbitoGlobal, Activo: true},
+	}
+
+	result := Recomendar(e, p, nil, nudges, u)
+
+	want := []int64{2, 4, 3} // Alfa, Beta, Yankee — alfabético, cap 3
+	if len(result.NudgesRecomendados) != 3 {
+		t.Fatalf("esperados 3 nudges, obtenidos %d", len(result.NudgesRecomendados))
+	}
+	for i, id := range want {
+		if result.NudgesRecomendados[i].ID != id {
+			t.Errorf("NudgesRecomendados[%d].ID = %d, want %d (selección alfabética)", i, result.NudgesRecomendados[i].ID, id)
+		}
+	}
+}
+
+func TestRecomendar_IncentivosCapSeleccionaPorNombre(t *testing.T) {
+	e, p, u := nudgeFixtureDepto(t)
+	incentivos := []domain.Incentivo{
+		{ID: 1, Nombre: "Zeta", Tipo: domain.IncentivoIdentidad, Activo: true, Disponibilidad: domain.DisponibilidadPermanente},
+		{ID: 2, Nombre: "Alfa", Tipo: domain.IncentivoIdentidad, Activo: true, Disponibilidad: domain.DisponibilidadPermanente},
+		{ID: 3, Nombre: "Yankee", Tipo: domain.IncentivoIdentidad, Activo: true, Disponibilidad: domain.DisponibilidadPermanente},
+		{ID: 4, Nombre: "Beta", Tipo: domain.IncentivoIdentidad, Activo: true, Disponibilidad: domain.DisponibilidadPermanente},
+	}
+
+	result := Recomendar(e, p, incentivos, nil, u)
+
+	want := []int64{2, 4, 3} // Alfa, Beta, Yankee — alfabético, cap 3
+	if len(result.IncentivosRecomendados) != 3 {
+		t.Fatalf("esperados 3 incentivos, obtenidos %d", len(result.IncentivosRecomendados))
+	}
+	for i, id := range want {
+		if result.IncentivosRecomendados[i].ID != id {
+			t.Errorf("IncentivosRecomendados[%d].ID = %d, want %d (selección alfabética)", i, result.IncentivosRecomendados[i].ID, id)
+		}
+	}
+}
+
 func TestRecomendar_NudgeDepartamento_CoincideDepto(t *testing.T) {
 	e, p, u := nudgeFixtureDepto(t)
 	nudges := []domain.Nudge{

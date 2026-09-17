@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"estimulos-incentivos/internal/domain"
@@ -87,6 +88,11 @@ func recomendarIncentivos(incentivos []domain.Incentivo, perfil domain.PerfilMAP
 			recomendados = append(recomendados, inc)
 		}
 	}
+	// Selección determinista: orden por nombre antes de truncar, para que
+	// el orden de entrada no decida qué recomendaciones se conservan.
+	sort.Slice(recomendados, func(i, j int) bool {
+		return recomendados[i].Nombre < recomendados[j].Nombre
+	})
 	if len(recomendados) > 3 {
 		recomendados = recomendados[:3]
 	}
@@ -107,6 +113,10 @@ func recomendarNudges(nudges []domain.Nudge, empleado domain.Empleado) []domain.
 			recomendados = append(recomendados, n)
 		}
 	}
+	// Selección determinista: orden por nombre antes de truncar.
+	sort.Slice(recomendados, func(i, j int) bool {
+		return recomendados[i].Nombre < recomendados[j].Nombre
+	})
 	if len(recomendados) > 3 {
 		recomendados = recomendados[:3]
 	}

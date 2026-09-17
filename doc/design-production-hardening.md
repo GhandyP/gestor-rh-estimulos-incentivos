@@ -85,8 +85,9 @@ employee), so an out-of-band write still cannot violate them.
 
 - Runner (`store.go`): creates `schema_migrations`, applies `000001_initial_schema` only when
   the `empleados` table is absent (legacy DBs already have it), applies the legacy `tipo`
-  column patch, then `000002_hardening` only if unregistered. Every pending migration is
-  followed by `PRAGMA foreign_key_check`; broken foreign keys abort startup.
+  column patch, then `000002_hardening` and `000003_nudge_target_depto` only if
+  unregistered. Every pending migration is followed by `PRAGMA foreign_key_check`; broken
+  foreign keys abort startup.
 - `000002_hardening.up.sql` is a **table rebuild**: defensive orphan backfill (child rows
   without parents are removed as unrecoverable data), recreate each table with explicit
   `CHECK`/`UNIQUE`/`ON DELETE CASCADE`, preserve all existing rows, then add access indexes
@@ -96,6 +97,11 @@ employee), so an out-of-band write still cannot violate them.
 - `000002_hardening.down.sql` is a **data-preserving rollback**: drops only what `000002`
   added (indexes, `CHECK`s, cascade FKs), rebuilding the tables back to the `000001` shape
   without losing rows. The runner does not re-apply an already-registered version.
+- `000003_nudge_target_depto.up.sql` is **additive**: it adds `nudges.target_depto
+  TEXT NOT NULL DEFAULT ''` so a department-scoped nudge can store its textual target
+  (departments are TEXT in `empleados.departamento`; `target_id` remains the individual-scope
+  target). `000003_nudge_target_depto.down.sql` drops only that column (SQLite `DROP
+  COLUMN`, ≥ 3.35) without touching rows.
 - **Operational guidance:** run one instance, back up the SQLite file before deploying a new
   version, and treat the `down` migration as the tested reverse path for a failed upgrade.
 

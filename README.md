@@ -33,7 +33,9 @@ go run ./cmd/server
 ```
 
 This local path uses plain HTTP, so `.env.example` sets `COOKIE_SECURE=false`; its credentials are
-clearly marked development-only examples and must be replaced before production-like use.
+clearly marked development-only examples and must be replaced before production-like use. Note
+that `.env.example` is intentionally not tracked in this repository; the documented demo values
+below are the complete set needed for the local path.
 
 Then:
 
@@ -150,7 +152,8 @@ credential or session-secret values.
 - The connection pool is intentionally limited to one connection. This is a single-process,
   single-instance design; multiple processes writing the same file are unsupported.
 - Migrations are embedded in the binary and tracked in `schema_migrations`. The hardening migration
-  rebuilds tables to add constraints and indexes while preserving valid rows.
+  rebuilds tables to add constraints and indexes while preserving valid rows; the department-target
+  migration adds `nudges.target_depto` so department-scoped nudges can match by name.
 - The container database is on the named volume `estimulos-data:/data` at
   `/data/estimulos.db`.
 - The operator must **back up** the SQLite file or volume. Stop the instance before copying the
@@ -161,8 +164,9 @@ credential or session-secret values.
 ## Demo data and operator flow
 
 On a fresh database, `Service.Seed` runs during startup only when no employees exist. The documented
-demo dataset contains **(6 employees, 8 incentives, 6 nudges)**. It is deterministic and startup
-fails if seeding returns an error.
+demo dataset contains **(6 employees, 8 incentives, 8 nudges)**, including two department-scoped
+nudges that demonstrate the `target_depto` matching against the employee's department. It is
+deterministic and startup fails if seeding returns an error.
 
 The main UI flow is:
 

@@ -279,7 +279,7 @@ func TestSeedPersistsAllDataAndIsIdempotent(t *testing.T) {
 		{"perfiles_map", 6},
 		{"umbrales", 6},
 		{"incentivos", 8},
-		{"nudges", 6},
+		{"nudges", 8},
 	}
 	for _, check := range want {
 		if got := countRows(t, store, check.table); got != check.count {
@@ -351,7 +351,7 @@ func TestSeedConcurrentCallsCreateOneSeedSet(t *testing.T) {
 		{"perfiles_map", 6},
 		{"umbrales", 6},
 		{"incentivos", 8},
-		{"nudges", 6},
+		{"nudges", 8},
 	} {
 		if got := countRows(t, store, check.table); got != check.count {
 			t.Fatalf("%s after concurrent Seed = %d, want %d", check.table, got, check.count)

@@ -143,16 +143,10 @@ func (s *Service) ListIncentivos(ctx context.Context) ([]domain.Incentivo, error
 
 // Nudges
 
-func (s *Service) CreateNudge(ctx context.Context, nombre, descripcion string, tipo domain.TipoNudge, ambito domain.AmbitoNudge, targetID int64, targetDepto string) (*domain.Nudge, error) {
-	n := &domain.Nudge{
-		Nombre:      nombre,
-		Descripcion: descripcion,
-		Tipo:        tipo,
-		Ambito:      ambito,
-		TargetID:    targetID,
-		TargetDepto: targetDepto,
-		Activo:      true,
-	}
+// CreateNudge persiste un nudge con sus valores de arranque (activo).
+// El caller arma la entidad con dominio y objetivo según el ámbito.
+func (s *Service) CreateNudge(ctx context.Context, n *domain.Nudge) (*domain.Nudge, error) {
+	n.Activo = true
 	if err := s.store.CreateNudge(ctx, n); err != nil {
 		return nil, err
 	}
@@ -653,13 +647,16 @@ func (s *Service) Seed(ctx context.Context) error {
 			nombre, desc string
 			tipo         domain.TipoNudge
 			ambito       domain.AmbitoNudge
+			targetDepto  string
 		}{
-			{"Evaluación 360° Pre-agendada", "Evaluación automática trimestral", domain.NudgeDefaults, domain.AmbitoGlobal},
-			{"Onboarding Automático", "Proceso de inducción sin pasos manuales", domain.NudgeDefaults, domain.AmbitoGlobal},
-			{"Team Completion Rate", "El 80% de tu equipo ya completó el plan", domain.NudgeSocialProof, domain.AmbitoGlobal},
-			{"Feedback como Oportunidad", "Enmarcar feedback positivamente", domain.NudgeFraming, domain.AmbitoGlobal},
-			{"One-click Capacitación", "Solicitar capacitación en un click", domain.NudgeFriccion, domain.AmbitoGlobal},
-			{"Formularios Auto-completados", "Pre-llenar solicitudes frecuentes", domain.NudgeFriccion, domain.AmbitoGlobal},
+			{"Evaluación 360° Pre-agendada", "Evaluación automática trimestral", domain.NudgeDefaults, domain.AmbitoGlobal, ""},
+			{"Onboarding Automático", "Proceso de inducción sin pasos manuales", domain.NudgeDefaults, domain.AmbitoGlobal, ""},
+			{"Team Completion Rate", "El 80% de tu equipo ya completó el plan", domain.NudgeSocialProof, domain.AmbitoGlobal, ""},
+			{"Feedback como Oportunidad", "Enmarcar feedback positivamente", domain.NudgeFraming, domain.AmbitoGlobal, ""},
+			{"One-click Capacitación", "Solicitar capacitación en un click", domain.NudgeFriccion, domain.AmbitoGlobal, ""},
+			{"Formularios Auto-completados", "Pre-llenar solicitudes frecuentes", domain.NudgeFriccion, domain.AmbitoGlobal, ""},
+			{"Defaults Ingeniería", "Defaults del departamento de Ingeniería", domain.NudgeDefaults, domain.AmbitoDepartamento, "Ingeniería"},
+			{"Defaults Ventas", "Defaults del departamento de Ventas", domain.NudgeDefaults, domain.AmbitoDepartamento, "Ventas"},
 		}
 
 		for _, nd := range nudges {
@@ -668,6 +665,7 @@ func (s *Service) Seed(ctx context.Context) error {
 				Descripcion: nd.desc,
 				Tipo:        nd.tipo,
 				Ambito:      nd.ambito,
+				TargetDepto: nd.targetDepto,
 				Activo:      true,
 			}
 			if err := tx.CreateNudge(ctx, n); err != nil {

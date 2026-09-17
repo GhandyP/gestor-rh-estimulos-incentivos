@@ -48,6 +48,8 @@ func (h *Handler) renderHTML(w http.ResponseWriter, page, name string, data any)
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
+	// El fallo de Write solo ocurre si el cliente se desconecta a mitad de la
+	// respuesta; no es recuperable ni accionable desde el handler.
 	_, _ = w.Write(buf.Bytes())
 }
 
@@ -172,6 +174,7 @@ func (h *Handler) renderLogin(w http.ResponseWriter, r *http.Request, status int
 		return
 	}
 	w.WriteHeader(status)
+	// El fallo de Write solo ocurre si el cliente se desconectó; nada accionable.
 	_, _ = w.Write(buf.Bytes())
 }
 
@@ -475,7 +478,8 @@ func (h *Handler) ImportCSVAPI(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CSVTemplatesAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=plantilla_empleados.csv")
-	io.WriteString(w, "nombre,email,cargo,departamento\n")
+	// El fallo de Write solo ocurre si el cliente se desconectó; nada accionable.
+	_, _ = io.WriteString(w, "nombre,email,cargo,departamento\n")
 }
 
 // =============================================================================
@@ -921,11 +925,18 @@ func (h *Handler) CreateNudgeAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
-	nudge, err := h.Svc.CreateNudge(r.Context(),
-		input.Nombre, input.Descripcion,
-		domain.TipoNudge(input.Tipo), domain.AmbitoNudge(input.Ambito), input.TargetID, input.TargetDepto)
+	nudge, err := h.Svc.CreateNudge(r.Context(), &domain.Nudge{
+		Nombre:      input.Nombre,
+		Descripcion: input.Descripcion,
+		Tipo:        domain.TipoNudge(input.Tipo),
+		Ambito:      domain.AmbitoNudge(input.Ambito),
+		TargetID:    input.TargetID,
+		TargetDepto: input.TargetDepto,
+	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Mensaje genérico: el detalle del error (driver SQLite, constraints)
+		// no debe filtrarse en la respuesta.
+		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
 
@@ -1107,9 +1118,10 @@ func (h *Handler) NudgeDetailPage(w http.ResponseWriter, r *http.Request) {
 // =============================================================================
 
 // writeJSON escribe una respuesta JSON con el header adecuado.
+// Si Encode falla a mitad de la respuesta (raro: serialización no soportada),
+// el cuerpo ya comenzó a escribirse; responder http.Error sería engañoso y no
+// hay recuperación posible, así que se descarta de forma intencional.
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		http.Error(w, "Error al serializar respuesta", http.StatusInternalServerError)
-	}
+	_ = json.NewEncoder(w).Encode(v)
 }
