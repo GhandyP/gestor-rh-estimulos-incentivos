@@ -179,21 +179,57 @@ func TestKeyPagesParseAndDeterministicRender(t *testing.T) {
 	}
 }
 
-// DEFECTO PREEXISTENTE (no slice 3): nudges/_card.html NO define el template
-// "nudge-card" que list.html invoca con {{template "nudge-card" .}}. Como
-// html/template resuelve las referencias {{template}} al ejecutar (incluso en
-// ramas no tomadas), la página /nudges no puede renderizarse: el handler
-// ignora el error de ExecuteTemplate y devuelve 200 vacío. El arreglo (agregar
-// {{define "nudge-card"}}) excede el alcance del slice 3 (solo list.html), así
-// que aquí solo se verifica que PARSEA.
-func TestNudgesListParses(t *testing.T) {
-	root := repoRoot(t)
-	paths := []string{
-		filepath.Join(root, "web", "templates", "base.html"),
-		filepath.Join(root, "web", "templates", "nudges", "list.html"),
-		filepath.Join(root, "web", "templates", "nudges", "_card.html"),
+func fixtureNudges() []domain.Nudge {
+	return []domain.Nudge{{
+		ID:          7,
+		Nombre:      "Ahorro energético",
+		Descripcion: "Mostrar el consumo actual antes de elegir",
+		Tipo:        domain.NudgeDefaults,
+		Ambito:      domain.AmbitoGlobal,
+		Activo:      true,
+	}}
+}
+
+func TestNudgesListRendersCard(t *testing.T) {
+	ts := mustParseTemplates(t)
+	nudge := fixtureNudges()[0]
+	var buf bytes.Buffer
+	data := map[string]interface{}{
+		"Nudges":    fixtureNudges(),
+		"CSRFToken": "tok-nudges",
 	}
-	if _, err := template.New("").Funcs(templateFuncs).ParseFiles(paths...); err != nil {
-		t.Fatalf("parse nudges templates: %v", err)
+	if err := ts.execute(&buf, "nudges-list", "base", data); err != nil {
+		t.Fatalf("render nudges list: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{
+		nudge.Nombre,
+		nudge.Descripcion,
+		`href="/nudges/` + strconv.FormatInt(nudge.ID, 10) + `"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("nudges list does not render %q: %q", want, out)
+		}
+	}
+}
+
+func TestNudgeDetailRendersNudgeData(t *testing.T) {
+	ts := mustParseTemplates(t)
+	nudge := fixtureNudges()[0]
+	var buf bytes.Buffer
+	data := map[string]interface{}{
+		"Nudge":     nudge,
+		"CSRFToken": "tok-nudges",
+	}
+	if err := ts.execute(&buf, "nudges-detail", "base", data); err != nil {
+		t.Fatalf("render nudge detail: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{nudge.Nombre, nudge.Descripcion, string(nudge.Tipo), string(nudge.Ambito)} {
+		if !strings.Contains(out, want) {
+			t.Errorf("nudge detail does not render %q: %q", want, out)
+		}
 	}
 }

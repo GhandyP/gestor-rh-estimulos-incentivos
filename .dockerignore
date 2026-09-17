@@ -2,10 +2,15 @@
 .git
 .atl
 .pi
+.codegraph/
 openspec
 *.md
+.env
+.env.*
+*.env
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 /server
 server

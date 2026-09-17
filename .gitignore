@@ -1,11 +1,13 @@
 # Local Pi runtime state
 .atl/
-.pi/
 
-# Local SQLite database and WAL files
-estimulos.db
+# Generated/local development state
+.codegraph/
+.env
+.env.*
+!.env.example
+*.db
 *.db-wal
 *.db-shm
-
-# Built binary (repo root only — must not ignore cmd/server/)
+*.db-journal
 /server

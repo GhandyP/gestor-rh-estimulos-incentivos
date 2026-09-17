@@ -23,6 +23,7 @@ func TestCIWorkflowRunsAllFourChecksAtRepoRoot(t *testing.T) {
 		"push:",
 		"pull_request:",
 		"go-version-file: go.mod",
+		"./scripts/compose-smoke.sh",
 	} {
 		if !strings.Contains(ci, want) {
 			t.Errorf("ci.yml no contiene %q", want)

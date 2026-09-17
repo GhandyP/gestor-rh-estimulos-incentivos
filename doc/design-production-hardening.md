@@ -1,20 +1,19 @@
 # Design — Production Hardening of the Estimulos & Incentivos MVP
 
-Status: implemented (slices 1–5 of the `production-hardening` change) · Scope: documentation
-of the hardened, as-built system for portfolio review.
+Status: as-built reference · Scope: the hardened system currently present in this repository.
 
 This document records the architectural decisions, integrity/security behavior, lifecycle,
-delivery, and limitations of the current implementation. It is the authoritative companion to
-the [README](../README.md); the original concept document
-[`2026-04-29-sistema-estimulos-incentivos-diseno.md`](2026-04-29-sistema-estimulos-incentivos-diseno.md)
-preserves the behavioral-model rationale (Fogg B = M × A × P, psychophysical thresholds).
+delivery, and limitations of the current implementation. It is the detailed companion to the
+[README](../README.md); the README is the operator-facing path, while this note explains why the
+boundaries and hardening choices exist. The behavioral model is Fogg B = M × A × P with
+psychophysical thresholds.
 
 ## 1. Architectural decisions
 
 | # | Decision | Choice | Rejected | Rationale |
 |---|----------|--------|----------|-----------|
-| ADR-1 | Layering | `domain → engine → service → handler → store/sqlite`, `cmd/server` entry point | Fat handlers, store in services | Dependency order keeps invariants near the data and HTTP concerns at the edge; each layer tests cleanly. |
-| ADR-2 | Domain validation | `Validate() error` on `Empleado`, `PerfilMAP`, `Umbral`, `Estimulo`, called by services before store access | Handler-only or SQL-only validation | One invariant source serves API, HTML, seed, and tests; SQL `CHECK`/`UNIQUE` remain the final integrity boundary. |
+| ADR-1 | Package boundaries | `cmd/server` wires startup; requests flow `handler → service`; `service` uses `domain`, `engine`, and `store/sqlite`; `engine` and `store/sqlite` depend on `domain` | Fat handlers, direct database access from handlers | The dependency direction keeps HTTP concerns at the edge, workflows in one place, and invariants reusable by the engine and persistence layer. |
+| ADR-2 | Domain validation | `Validate() error` on `Empleado`, `PerfilMAP`, `Umbral`, and `Estimulo`; service workflows call it where those invariants apply, while SQLite remains the final boundary | Handler-only or SQL-only validation | One invariant source is reusable by workflows and tests; SQL `CHECK`/`UNIQUE` remain the final integrity boundary for out-of-band writes. |
 | ADR-3 | Transactions | `Store.WithTx` owns begin/commit/rollback; workflow repository calls take `*sql.Tx` | Nested DB calls or callbacks using the pool | The original `CreateEmpleadoConPerfil` was falsely atomic (ignored the `tx` it received). One connection + one transaction = real atomicity. |
 | ADR-4 | Stimulus idempotency | `ApplyEstimulo` runs `UPDATE ... WHERE estado='pendiente'`, checks `RowsAffected`, then history + recalibration in the same transaction; returns `ApplyResult{Applied, Conflict}` | Pre-read-then-update | The conditional transition is race-safe: a concurrent loser gets a deterministic `Conflict` and cannot create side effects. |
 | ADR-5 | Operator security | Environment-configured single operator (`OPERATOR_USER`/`OPERATOR_PASSWORD`), `SESSION_SECRET`-signed sessions, `Secure`/`HttpOnly`/`SameSite=Lax` cookie, auth middleware, session-bound CSRF on mutations | Hardcoded secret, SSO/OIDC, multi-role RBAC | Fits the declared single-instance scope; secrets stay deploy-time configurable. |
@@ -22,10 +21,37 @@ preserves the behavioral-model rationale (Fogg B = M × A × P, psychophysical t
 | ADR-7 | Database engine | SQLite via `modernc.org/sqlite` (CGO-free), single pooled connection, `foreign_keys` pragma per connection | PostgreSQL, `database/sql` with a driver needing CGO | Pure-Go, portable, matches the MVP; single connection makes SQLite locking predictable. |
 | ADR-8 | Migrations | Embedded SQL files in `internal/store/sqlite/migrations`, idempotent runner with `schema_migrations`, `PRAGMA foreign_key_check` gate | `golang-migrate` CLI | No external tooling; migrations travel with the binary; legacy DBs upgrade in place. |
 
+### Runtime flow
+
+Read the arrows below as calls or dependencies, not as deployment replicas. `cmd/server.run`
+constructs the graph, prepares the database and templates, and starts one listener. Health probes
+are deliberately outside the authenticated application mux; every other route enters the security
+chain before reaching a handler.
+
+```mermaid
+flowchart TD
+    Boot["cmd/server.run"] --> Open["open SQLite + migrate"]
+    Open --> Seed["Service.Seed when no employees exist"]
+    Seed --> Auth["load operator auth config"]
+    Auth --> Templates["ParseTemplates once"]
+    Templates --> Routes["register routes + listen"]
+    Routes --> Public["/healthz + /readyz"]
+    Routes --> Guard["RequireAuth → CSRFProtect"]
+    Guard --> Handler["internal/handler"]
+    Handler --> Service["internal/service"]
+    Service --> Engine["internal/engine"]
+    Service --> Store["internal/store/sqlite"]
+    Engine --> Domain["internal/domain"]
+    Store --> Domain
+    Store --> SQLite[("SQLite file")]
+```
+
 ## 2. Validation behavior
 
-Validation lives in `internal/domain` and is invoked at the service boundary before any
-store write (`service.go` wraps every create/update command in `Validate()`).
+Validation lives in `internal/domain` and is applied at the service boundary for the workflows
+that have explicit domain invariants. Employee creation, MAP profile updates, recommended stimuli,
+and threshold recalibration are validated before their associated writes; auxiliary updates without
+a domain `Validate` method remain bounded by their store and SQLite constraints.
 
 | Entity | Invariants enforced |
 |--------|---------------------|
@@ -126,6 +152,9 @@ employee), so an out-of-band write still cannot violate them.
   pre-existing `incomplete or empty template` 500s on every HTMX partial endpoint).
 - Rendering (`renderHTML`) buffers first, then writes: a render failure returns a generic
   `500` with no partial output.
+- The nudge list composes `nudges/list.html` with the named `nudge-card` partial, and the detail
+  page passes its data under `.Nudge`. The current render tests (`TestNudgesListRendersCard` and
+  `TestNudgeDetailRendersNudgeData`) protect both paths against the earlier template mismatch.
 
 ## 8. Docker and CI delivery
 
@@ -158,15 +187,15 @@ employee), so an out-of-band write still cannot violate them.
   the seed runs once at startup.
 - **No external integrations, PostgreSQL, Kubernetes, analytics/ML, or browser E2E** — all
   retained as explicit non-goals.
-- **Known template defect (not fixed here):** the nudge list/detail pages execute against
-  `nudges/_card.html` (no `{{define "nudge-card"}}`) and a map root in
-  `nudges/detail.html`; they render a generic `500`. `PUT /api/nudges/{id}/toggle` falls
-  back to JSON and still works. A dedicated correction is required.
+- **Nudge rendering:** the earlier list/detail template mismatch is resolved in the current
+  source: `_card.html` defines `nudge-card`, and `detail.html` consumes `.Nudge`. The render tests
+  cover the real list/detail data paths. The toggle handler still retains a JSON fallback if card
+  rendering fails unexpectedly.
 
 ## 10. Walkthrough (matches tested behavior)
 
-> Every step below reflects behavior covered by the automated suites (domain, store,
-> service, handler httptest, template render) and the slice-4 runtime smoke test.
+> Every step below reflects the current implementation and the automated suites (domain, store,
+> service, handler httptest, template render, delivery, lifecycle, and documentation contract).
 
 1. **Start** `go run ./cmd/server` → migrations + seed run on an empty DB; `/readyz` becomes
    `ready`; startup events are visible in `slog` output.
@@ -189,18 +218,20 @@ employee), so an out-of-band write still cannot violate them.
    first application transitions the stimulus to `aplicado`, records one history point, and
    recalibrates the threshold atomically. Re-applying returns `Conflict` and changes
    nothing; concurrent applications have a single winner (tested with 8 goroutines).
-8. **Nudge toggle** (`PUT /api/nudges/{id}/toggle`) flips active state and responds via the
-   JSON fallback; the nudge list/detail **pages** currently render a generic `500` due to the
-   documented pre-existing template defect — do not present these pages as working in the
-   demo.
+8. **Nudge toggle** (`PUT /api/nudges/{id}/toggle`) flips active state and normally returns the
+   updated card; the handler keeps a JSON fallback for an unexpected card-rendering failure. The
+   nudge list/detail pages render their current data through the corrected named partial and
+   `.Nudge` detail root, with focused template-render coverage.
 9. **Shutdown** with `Ctrl-C` (SIGINT): logs `shutting down, draining active requests`,
    drains in-flight requests within the bound, logs `shutdown complete`, and exits 0.
 
-## 11. References
+## 11. Verification references
 
-- OpenSpec change artifacts: `openspec/changes/production-hardening/` (proposal, specs,
-  design, tasks, apply-progress).
-- Test evidence: `internal/domain/validate_test.go`, `internal/store/sqlite/store_test.go`,
-  `internal/service/service_test.go`, `internal/store/sqlite/migrations_test.go`,
-  `internal/handler/{auth,csrf,routes,templates_*}_test.go`,
-  `cmd/server/{config,root,health,lifecycle,delivery,ci}_test.go`.
+The implementation evidence for this note is maintained in the current test suites:
+
+- Domain and engine behavior: `internal/domain/validate_test.go`, `internal/engine/engine_test.go`.
+- Persistence and workflows: `internal/store/sqlite/{store,migrations}_test.go`,
+  `internal/service/service_test.go`.
+- HTTP security and rendering: `internal/handler/{auth,csrf,routes,templates_*}_test.go`.
+- Startup, delivery, and documentation contracts:
+  `cmd/server/{config,root,health,lifecycle,delivery,ci,docs_contract}_test.go`.
